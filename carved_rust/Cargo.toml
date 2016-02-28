@@ -1,0 +1,6 @@
+[package]
+name = "carved_rust"
+version = "0.1.0"
+authors = ["Swooshed <dmcgill9071@gmail.com>"]
+
+[dependencies]
