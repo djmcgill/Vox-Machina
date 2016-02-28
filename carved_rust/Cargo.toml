@@ -4,3 +4,8 @@ version = "0.1.0"
 authors = ["Swooshed <dmcgill9071@gmail.com>"]
 
 [dependencies]
+nalgebra = "0.5.1"
+
+[lib]
+name = "carved_rust"
+crate-type = ["dylib"]
