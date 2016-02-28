@@ -5,6 +5,8 @@
 # =============== #
 Temp/
 Library/
+*.dll.meta
+*.bundle.meta
 
 # ===================================== #
 # Visual Studio / MonoDevelop generated #
