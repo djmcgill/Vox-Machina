@@ -1,7 +1,13 @@
+#![allow(dead_code)]
+
+#[macro_use] extern crate lazy_static;
 extern crate nalgebra;
 mod svo;
 
+mod unity_interface_enums;
+mod unity_interface_guid;
 pub mod carved_rust;
+pub mod unity_interfaces;
 
 #[test]
 fn it_works() {
