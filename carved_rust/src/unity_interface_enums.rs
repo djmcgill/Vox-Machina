@@ -18,7 +18,7 @@ pub enum UnityGfxRenderer
 }
 
 pub enum UnityGfxDeviceEventType {
-    Initialize     = 0,
+	Initialize     = 0,
 	Shutdown       = 1,
 	BeforeReset    = 2,
 	AfterReset     = 3,

@@ -8,15 +8,23 @@ lazy_static! {
 	static ref PLUGIN: Mutex<Cell<Option<UnityPlugin<'static>>>> = Mutex::new(Cell::new(None));
 }
 
+fn plugin_set(new_plugin: Option<UnityPlugin<'static>>) {
+	PLUGIN.lock().unwrap().set(new_plugin);
+}
+
+fn plugin_get() -> Option<UnityPlugin<'static>> {
+	PLUGIN.lock().unwrap().get()
+}
+
 #[no_mangle] #[allow(non_snake_case)]
 pub extern "C" fn UnityPluginLoad(unity_interfaces: *const IUnityInterfaces) {
 	let plugin : UnityPlugin = unsafe {UnityPlugin::new(&*unity_interfaces) };
-	PLUGIN.lock().unwrap().set(Some(plugin));
+	plugin_set(Some(plugin));
 }
 
 #[no_mangle] #[allow(non_snake_case)]
 pub extern "C" fn UnityPluginUnload() {
-	PLUGIN.lock().unwrap().set(None);
+	plugin_set(None);
 }
 
 #[derive (Copy, Clone)]
@@ -97,7 +105,7 @@ fn on_graphics_device_event(event_type: UnityGfxDeviceEventType) {
 	match event_type {
 		UnityGfxDeviceEventType::Initialize => {
 			let cell = PLUGIN.lock().unwrap();
-			let old_plugin = cell.get().unwrap();
+			let old_plugin = plugin_get().unwrap();
 			let new_renderer = old_plugin.graphics_interface.get_renderer();
 			cell.set(Some(UnityPlugin {graphics_renderer: Some(new_renderer), .. old_plugin}));
             // TODO: user initialization code
