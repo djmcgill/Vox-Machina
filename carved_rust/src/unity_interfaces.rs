@@ -18,13 +18,19 @@ fn plugin_get() -> Option<UnityPlugin<'static>> {
 
 #[no_mangle] #[allow(non_snake_case)]
 pub extern "C" fn UnityPluginLoad(unity_interfaces: *const IUnityInterfaces) {
-	let plugin : UnityPlugin = unsafe {UnityPlugin::new(&*unity_interfaces) };
+	println!("UnityPluginLoad called with {:?}", unity_interfaces);
+	let plugin : UnityPlugin = unsafe { UnityPlugin::new(&*unity_interfaces) };
 	plugin_set(Some(plugin));
+	on_graphics_device_event(UnityGfxDeviceEventType::Initialize);
 }
 
 #[no_mangle] #[allow(non_snake_case)]
 pub extern "C" fn UnityPluginUnload() {
+	let plugin = plugin_get().unwrap();
+	plugin.graphics_interface.unregister_device_event_callback(on_graphics_device_event);
+	println!("1");
 	plugin_set(None);
+	println!("2");
 }
 
 #[derive (Copy, Clone)]
@@ -44,6 +50,7 @@ impl<'a> UnityPlugin<'a> {
 	}
 }
 
+#[repr(C)]
 pub struct IUnityInterfaces {
 	// Returns an interface matching the guid.
 	// Returns nullptr if the given interface is unavailable in the active Unity runtime.
@@ -60,16 +67,18 @@ impl IUnityInterfaces {
 	}
 
 	fn get_graphics_interface<'a>(&self) -> &'a IUnityGraphics {
+		println!("get graphics interface");
 		let interface_ptr = self.get_interface(UnityInterfaceGUID::graphics_guid()).unwrap();
 		let graphics_ref = unsafe { &mut *(interface_ptr as *mut IUnityGraphics)};
 		graphics_ref.register_device_event_callback(on_graphics_device_event);
-		on_graphics_device_event(UnityGfxDeviceEventType::Initialize);
+		println!("finished get graphics interface");
 		graphics_ref
 	}
 }
 
 struct IUnityInterface;
 
+#[repr(C)]
 struct IUnityGraphics {
 	get_renderer_raw : fn() -> UnityGfxRenderer, // Thread safe
 
@@ -85,27 +94,24 @@ impl IUnityGraphics {
 		(self.get_renderer_raw)()
 	}
 
-	fn register_device_event_callback(&mut self, callback: fn (UnityGfxDeviceEventType) -> ()) {
+	fn register_device_event_callback(&self, callback: fn (UnityGfxDeviceEventType) -> ()) {
+		println!("registering callback");
 		(self.register_device_event_callback_raw)(callback)
 	}
 
-	fn unregister_device_event_callback(&mut self, callback: fn (UnityGfxDeviceEventType) -> ()) {
+	fn unregister_device_event_callback(&self, callback: fn (UnityGfxDeviceEventType) -> ()) {
+		println!("unregistering callback");
 		(self.unregister_device_event_callback_raw)(callback)	
-	}
-}
-
-impl Drop for IUnityGraphics {
-	fn drop(&mut self) {
-		self.unregister_device_event_callback(on_graphics_device_event);
 	}
 }
 
 // This is the function that actually does stuff.
 fn on_graphics_device_event(event_type: UnityGfxDeviceEventType) {
+	println!("on_graphics_device_event called with {:?}", event_type);
 	match event_type {
 		UnityGfxDeviceEventType::Initialize => {
 			let cell = PLUGIN.lock().unwrap();
-			let old_plugin = plugin_get().unwrap();
+			let old_plugin = cell.get().unwrap();
 			let new_renderer = old_plugin.graphics_interface.get_renderer();
 			cell.set(Some(UnityPlugin {graphics_renderer: Some(new_renderer), .. old_plugin}));
             // TODO: user initialization code
@@ -123,4 +129,21 @@ fn on_graphics_device_event(event_type: UnityGfxDeviceEventType) {
 			//TODO: user Direct3D 9 code
 		},
 	}
+	println!("on_graphics_device_event called with {:?} finished", event_type);
+}
+
+#[no_mangle] #[allow(non_snake_case)]
+pub extern "C" fn SetTimeFromUnity(time: f32) {
+	println!("SetTimeFromUnity with {:?}", time);
+}
+
+#[no_mangle] #[allow(non_snake_case)]
+pub extern "C" fn GetRenderEventFunc() -> (fn(i32) -> ()) {
+	println!("GetRenderEventFunc called");
+	on_render_event
+}
+
+#[allow(non_snake_case)]
+fn on_render_event(eventID: i32) {
+	println!("on_render_event called with {}", eventID);
 }

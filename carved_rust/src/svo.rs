@@ -35,8 +35,8 @@ impl SVO {
 
     // If the SVO is a Voxel, split it into octants. If it's already octants, panic.
     fn subdivide_voxel(&mut self) {
-        match self as &SVO {
-            &SVO::Voxel(block_type) =>
+        match *self {
+            SVO::Voxel(block_type) =>
                 *self = SVO::new_octants([block_type, block_type, block_type, block_type,
                                           block_type, block_type, block_type, block_type]),
             _ => panic!("subdivide_voxel called on a non-voxel!")
@@ -53,12 +53,12 @@ impl SVO {
         match index.split_first() {
             None => *self = SVO::Voxel(new_block_type), // Overwrite whatever's here with a new voxel.
             Some((ix, rest)) => {
-                match self {
-                    &mut ref mut new_self @ SVO::Voxel(_) => { // If we find a voxel but need to go deeper then split it.
+                match *self {
+                    ref mut new_self @ SVO::Voxel(_) => { // If we find a voxel but need to go deeper then split it.
                         new_self.subdivide_voxel();
                         new_self.set_block_and_recombine(index, new_block_type);
                     },
-                    &mut SVO::Octants(ref mut octants) => { // Insert into the sub_octant
+                    SVO::Octants(ref mut octants) => { // Insert into the sub_octant
                         octants[*ix as usize].set_block_and_recombine(rest, new_block_type);
                     }
                 }
@@ -73,16 +73,16 @@ impl SVO {
 
     // If the SVO is a Voxel, return its contents.
     pub fn get_voxel_type(&self) -> Option<BlockType> {
-        match self {
-            &SVO::Voxel(voxel_type) => Some(voxel_type),
+        match *self {
+            SVO::Voxel(voxel_type) => Some(voxel_type),
             _ => None
         }
     }
 
     // If the SVO is Octants, return its contents.
     fn get_octants(&self) -> Option<&[Box<SVO>; 8]> {
-        match self {
-            &SVO::Octants(ref octants) => Some(octants),
+        match *self {
+            SVO::Octants(ref octants) => Some(octants),
             _ => None
         }
     }
@@ -111,10 +111,10 @@ impl SVO {
         let t_max = [t_max_x, t_max_y, t_max_z].iter().cloned().fold(max_dist, f32::min);
         if t_min > t_max {return None};
         let hit_position = ray_dir * t_min + ray_origin;
-        match self {
-            &SVO::Voxel(0) => None,
-            &SVO::Voxel(_) => Some(hit_position),
-            &SVO::Octants(ref octants) => {
+        match *self {
+            SVO::Voxel(0) => None,
+            SVO::Voxel(_) => Some(hit_position),
+            SVO::Octants(ref octants) => {
                 // work out which voxels are hit in turn, and if they're solid or not
                 let children : [(bool, bool, bool); 8] = {
                     let x = hit_position.x > 0.5;
@@ -179,9 +179,9 @@ impl<'a> Index<&'a [u8]> for SVO {
     fn index(&self, index: &[u8]) -> &SVO {
         match index.split_first() {
             None => self,
-            Some((ix, rest)) => match self {
-                &SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
-                &SVO::Octants(ref octants) => octants[*ix as usize].index(rest)
+            Some((ix, rest)) => match *self {
+                SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
+                SVO::Octants(ref octants) => octants[*ix as usize].index(rest)
             }                
         }
     }
@@ -191,9 +191,9 @@ impl<'a> IndexMut<&'a [u8]> for SVO {
     fn index_mut(&mut self, index: &[u8]) -> &mut SVO {
         match index.split_first() {
             None => self,
-            Some((ix, rest)) => match self {
-                &mut SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
-                &mut SVO::Octants(ref mut octants) => octants[*ix as usize].index_mut(rest)
+            Some((ix, rest)) => match *self {
+                SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
+                SVO::Octants(ref mut octants) => octants[*ix as usize].index_mut(rest)
             }
         }
     }

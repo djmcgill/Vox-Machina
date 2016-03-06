@@ -4,20 +4,25 @@ using System.Collections;
 using System.Runtime.InteropServices;
 
 public class NewBehaviourScript : MonoBehaviour {
-    [DllImport("carved_rust")]
+    [DllImport("libcarved_rust")]
     private static extern IntPtr svo_create(int x);
 
-    [DllImport("carved_rust")]
+    [DllImport("libcarved_rust")]
     private static extern void svo_destroy(IntPtr svo);
 
-    [DllImport("carved_rust")]
+    [DllImport("libcarved_rust")]
     private static extern int svo_get_voxel_type(IntPtr svo);
 
-    [DllImport("carved_rust")]
+    [DllImport("libcarved_rust")]
     private static extern void svo_set_voxel_type(IntPtr svo, int block_type);
 
-    // Use this for initialization
-    void Start () {
+    [DllImport ("libcarved_rust")]
+    private static extern void SetTimeFromUnity(float t);
+
+    [DllImport ("libcarved_rust")]
+    private static extern IntPtr GetRenderEventFunc();
+
+    IEnumerator Start() {
         print("Starting");
         var svo = svo_create(1);
         var block1 = svo_get_voxel_type(svo);
@@ -28,11 +33,23 @@ public class NewBehaviourScript : MonoBehaviour {
         var block3 = svo_get_voxel_type(svo);
         print(block3);
         svo_destroy(svo);
-        print("finished");
+        print("finished startup");
+        yield return StartCoroutine("CallPluginAtEndOfFrames");
     }
-	
-	// Update is called once per frame
-	void Update () {
-	
-	}
+
+    private IEnumerator CallPluginAtEndOfFrames() {
+        while (true) {
+            // Wait until all frame rendering is done
+            yield return new WaitForEndOfFrame();
+
+            // Set time for the plugin
+            SetTimeFromUnity (Time.timeSinceLevelLoad);
+
+            // Issue a plugin event with arbitrary integer identifier.
+            // The plugin can distinguish between different
+            // things it needs to do based on this ID.
+            // For our simple plugin, it does not matter which ID we pass here.
+            GL.IssuePluginEvent(GetRenderEventFunc(), 1);
+        }
+    }
 }

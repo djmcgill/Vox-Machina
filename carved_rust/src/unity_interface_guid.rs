@@ -1,3 +1,4 @@
+#[repr(C)]
 pub struct UnityInterfaceGUID {
 	high: u64, // TODO: use c_ulonglong instead
 	low: u64

@@ -17,6 +17,7 @@ pub enum UnityGfxRenderer
 	D3D12             = 18, // Direct3D 12
 }
 
+#[derive (Debug)]
 pub enum UnityGfxDeviceEventType {
 	Initialize     = 0,
 	Shutdown       = 1,
