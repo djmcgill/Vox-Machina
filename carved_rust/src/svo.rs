@@ -172,6 +172,17 @@ impl SVO {
     }
     // TODO: some way of drawing the current octree i.e. putting verts etc into opengl
     // TODO: write tests!
+
+    pub fn on_voxels(&self, on_voxel: fn(f32, f32, f32, i32, i32) -> ()) {
+        self.on_voxels_from(on_voxel, 0., 0., 0., 0);
+    }
+
+    fn on_voxels_from(&self, on_voxel: fn(f32, f32, f32, i32, i32) -> (), x: f32, y: f32, z: f32, depth: i32) {
+        match *self {
+            SVO::Voxel(voxel_type) => { on_voxel(x, y, z, depth, voxel_type); }
+            SVO::Octants(ref octants) => { unimplemented!(); }
+        }
+    }
 }
 
 impl<'a> Index<&'a [u8]> for SVO {
