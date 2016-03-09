@@ -1,28 +1,26 @@
-extern crate nalgebra;
-
-//use nalgebra::Vec3;
 use nalgebra::*;
 use std::ops::{Index, IndexMut};
-
-pub type BlockType = i32;
 
 #[derive(Debug, PartialEq)]
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 pub enum SVO {
-    Voxel (BlockType),
-    Octants ([Box<SVO>; 8]) // Each octant is addressed by the bit vector [z, y, x] 
-                            // where the variables are booleans for if the octant is ABOVE the given axis.
-                            // For example, the octant at index 6 (b110) is the cube with 0 <= x < 0.5, 
-                            // 0.5 <= y < 1, and 0.5 <= z < 1.
-                            // i.e. ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
+    // At the moment a voxel only has a "type".
+    Voxel (i32),
+
+    // Each octant is addressed by the bit vector [z, y, x] 
+    // where the variables are booleans for if the octant is ABOVE the given axis.
+    // For example, the octant at index 6 (b110) is the cube with 0 <= x < 0.5, 
+    // 0.5 <= y < 1, and 0.5 <= z < 1.
+    // i.e. ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
+    Octants ([Box<SVO>; 8]) 
 }
 
 impl SVO {
-    pub fn new_voxel(block_type: BlockType) -> SVO {
+    pub fn new_voxel(block_type: i32) -> SVO {
         SVO::Voxel(block_type)
     }
 
-    pub fn new_octants(octant_types: [BlockType; 8]) -> SVO {
+    pub fn new_octants(octant_types: [i32; 8]) -> SVO {
         let new_boxed_voxel = |ix| Box::new(SVO::new_voxel(octant_types[ix]));
         SVO::Octants([new_boxed_voxel(0), new_boxed_voxel(1), new_boxed_voxel(2), new_boxed_voxel(3),
                       new_boxed_voxel(4), new_boxed_voxel(5), new_boxed_voxel(6), new_boxed_voxel(7)])
@@ -45,25 +43,27 @@ impl SVO {
 
     // Follow an index, splitting voxels as necessary. The set the block at the target to `Voxel(new_block_type)`.
     // Then go back up the tree, recombining if we've transformed all the octants in a node to the same voxel.
-    pub fn set_block_and_recombine(&mut self, index: &[u8], new_block_type: BlockType) {
-        if let &SVO::Voxel(block_type) = self as &SVO { // If we're trying to insert the block_type that's already there
-            if block_type == new_block_type {return;}   // then there's nothing to do.
+    pub fn set_block_and_recombine(&mut self, index: &[u8], new_block_type: i32) {
+        if let Some(block_type) = self.get_voxel_type() {
+            if block_type == new_block_type {return;} // nothing to do
         }
 
         match index.split_first() {
-            None => *self = SVO::Voxel(new_block_type), // Overwrite whatever's here with a new voxel.
-            Some((ix, rest)) => {
-                match *self {
-                    ref mut new_self @ SVO::Voxel(_) => { // If we find a voxel but need to go deeper then split it.
-                        new_self.subdivide_voxel();
-                        new_self.set_block_and_recombine(index, new_block_type);
-                    },
-                    SVO::Octants(ref mut octants) => { // Insert into the sub_octant
-                        octants[*ix as usize].set_block_and_recombine(rest, new_block_type);
-                    }
+            // Overwrite whatever's here with the new voxel.
+            None => *self = SVO::Voxel(new_block_type), 
+
+            // We need to go deeper
+            Some((ix, rest)) => { 
+                // Voxels get split up
+                if self.get_voxel_type().is_some() { self.subdivide_voxel(); } 
+
+                {
+                    let ref mut octants = self.get_mut_octants().unwrap();
+                    // Insert into the sub_octant
+                    octants[*ix as usize].set_block_and_recombine(rest, new_block_type);
                 }
 
-                // If we have 8 voxels of the same type, combine them.
+                // Then if we have 8 voxels of the same type, combine them.
                 if let Some(combined_block_type) = self.get_octants().and_then(SVO::combine_voxels) {
                     *self = SVO::Voxel(combined_block_type);
                 }
@@ -72,7 +72,7 @@ impl SVO {
     }
 
     // If the SVO is a Voxel, return its contents.
-    pub fn get_voxel_type(&self) -> Option<BlockType> {
+    pub fn get_voxel_type(&self) -> Option<i32> {
         match *self {
             SVO::Voxel(voxel_type) => Some(voxel_type),
             _ => None
@@ -87,11 +87,18 @@ impl SVO {
         }
     }
 
+    fn get_mut_octants(&mut self) -> Option<&mut [Box<SVO>; 8]> {
+        match *self {
+            SVO::Octants(ref mut octants) => Some(octants),
+            _ => None
+        }
+    }
+
     // Cast a ray into the octree and return the position of collision with a non-type-zero voxel (if any).
     // x = t*d + o where t = length of ray.
     // t = (x-o)/d
     // BUT we know that the hit will have be on the boundary on the cube.
-    // So for each axis independantly, work out the length to hit 0. and 1.
+    // So for each axis independently, work out the length to hit 0. and 1.
     pub fn cast_ray(&self, ray_origin: Vec3<f32>, ray_dir: Vec3<f32>) -> Option<Vec3<f32>> {
         let eps = 0.001;
         let sanitise = |f: f32| if f.abs() < eps {eps * f.signum()} else {f};
@@ -104,9 +111,9 @@ impl SVO {
         let min_dist = 0.;
         let max_dist = 100000.;
         // TODO: can simplify this by mirroring the ray direction so they all point the same way
-        let (t_min_x, t_max_x) = SVO::sort_ts(ray_origin.x, inv_ray_dir.x);
-        let (t_min_y, t_max_y) = SVO::sort_ts(ray_origin.y, inv_ray_dir.y);
-        let (t_min_z, t_max_z) = SVO::sort_ts(ray_origin.z, inv_ray_dir.z);
+        let (t_min_x, t_max_x) = sorted_ts(ray_origin.x, inv_ray_dir.x);
+        let (t_min_y, t_max_y) = sorted_ts(ray_origin.y, inv_ray_dir.y);
+        let (t_min_z, t_max_z) = sorted_ts(ray_origin.z, inv_ray_dir.z);
         let t_min = [t_min_x, t_min_y, t_min_z].iter().cloned().fold(min_dist, f32::max);
         let t_max = [t_max_x, t_max_y, t_max_z].iter().cloned().fold(max_dist, f32::min);
         if t_min > t_max {return None};
@@ -126,25 +133,25 @@ impl SVO {
                       (!x, !y, !z)]
                 };
 
-                let test_child = |above_x : bool, above_y : bool, above_z : bool| -> Option<Vec3<f32>> {
+                // TODO: stop throwing away the hit position between iterations - if it's on the "near" edge
+                // then it's the same as for the nearer children
+                // TODO: also this should probably take &Vec3<bool> instead.
+                let test_child = |(above_x, above_y, above_z): (bool, bool, bool)| -> Option<Vec3<f32>> {
                     let (above_x, above_y, above_z) = (above_x as usize, above_y as usize, above_z as usize);
                     let child_ix = above_x | (above_y<<1) | (above_z<<2);
                     let above_center = Vec3::new(above_x as f32, above_y as f32, above_z as f32);
-                    let new_origin = SVO::to_child_space(ray_origin, above_center);
+                    let new_origin = to_child_space(ray_origin, above_center);
                     octants[child_ix].cast_ray_sanitised(new_origin, ray_dir, inv_ray_dir).map (|child_hit: Vec3<f32>| {
-                        SVO::from_child_space(child_hit, above_center)
+                        from_child_space(child_hit, above_center)
                     })
                 };
                 
-                children.into_iter()
-                        .map(|&(x, y, z)| test_child(x, y, z))
-                        .find(|x| x.is_some()) // Surely there's a better way to get the first Some in a list??
-                        .and_then(|x| x)
+                children.iter().cloned().map(test_child).find(|x| x.is_some()).and_then(|x| x)
             }
         }
     }
 
-    fn combine_voxels(octants: &[Box<SVO>; 8]) -> Option<BlockType> {
+    fn combine_voxels(octants: &[Box<SVO>; 8]) -> Option<i32> {
         octants[0].get_voxel_type().and_then( |voxel_type| {
             let mut tail = octants.iter().skip(1);
             if tail.all(|octant| octant.get_voxel_type() == Some(voxel_type)) {
@@ -155,34 +162,52 @@ impl SVO {
         })
     }
 
-    fn sort_ts(o: f32, inv_d: f32) -> (f32, f32) {
-        let min_extent = 0.;
-        let max_extent = 1.;
-        let t1 = (min_extent-o) * inv_d;
-        let t2 = (max_extent-o) * inv_d;
-        if t1 < t2 {(t1, t2)} else {(t2, t1)}
+
+    // TODO: write tests for this!
+    pub fn on_voxels(&self, on_voxel: fn(f32, f32, f32, i32, i32)) {
+        let on_voxel_vec = &|offset : Vec3<f32>, depth: i32, voxel_type: i32 |
+            { on_voxel(offset.x, offset.y, offset.z, depth, voxel_type) }; 
+        self.on_voxels_from(on_voxel_vec, zero(), 1);
     }
 
-    fn to_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
-        (vec - offsets*0.5)*2.
-    }
-
-    fn from_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
-        vec/2. + offsets*0.5
-    }
-    // TODO: some way of drawing the current octree i.e. putting verts etc into opengl
-    // TODO: write tests!
-
-    pub fn on_voxels(&self, on_voxel: fn(f32, f32, f32, i32, i32) -> ()) {
-        self.on_voxels_from(on_voxel, 0., 0., 0., 0);
-    }
-
-    fn on_voxels_from(&self, on_voxel: fn(f32, f32, f32, i32, i32) -> (), x: f32, y: f32, z: f32, depth: i32) {
+    fn on_voxels_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
+        where F : Fn(Vec3<f32>, i32, i32) {
         match *self {
-            SVO::Voxel(voxel_type) => { on_voxel(x, y, z, depth, voxel_type); }
-            SVO::Octants(ref octants) => { unimplemented!(); }
+            SVO::Voxel(voxel_type) => { on_voxel(origin, depth, voxel_type); }
+            SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
+                let next_depth = depth + 1;
+                let offset = above_axis(ix) / next_depth as f32;
+                octant.on_voxels_from(on_voxel, origin + offset, next_depth);
+            }   
         }
     }
+}
+
+fn sorted_ts(ray_origin: f32, inv_ray_dir: f32) -> (f32, f32) {
+    let min_cube_extent = 0.;
+    let max_cube_extent = 1.;
+    let t1 = (min_cube_extent-ray_origin) * inv_ray_dir;
+    let t2 = (max_cube_extent-ray_origin) * inv_ray_dir;
+    if t1 < t2 { (t1, t2) } else { (t2, t1) }
+}
+
+// TODO: test these specifically
+fn to_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
+    (vec - offsets*0.5)*2.
+}
+
+// TODO: test these specifically
+fn from_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
+    vec*0.5 + offsets*0.5
+}
+
+// returns a vector with either 0. or 1. as its elements
+fn above_axis(ix: usize) -> Vec3<f32> {
+    Vec3::new((ix & 1) as f32, (ix & 2) as f32, (ix & 4) as f32)
+}
+
+fn above_center(v: &Vec3<f32>) -> Vec3<bool> {
+    Vec3::new(v.x > 0.5, v.y > 0.5, v.z > 0.5)
 }
 
 impl<'a> Index<&'a [u8]> for SVO {
