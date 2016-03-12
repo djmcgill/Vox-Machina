@@ -203,7 +203,9 @@ fn from_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
 
 // returns a vector with either 0. or 1. as its elements
 fn above_axis(ix: usize) -> Vec3<f32> {
-    Vec3::new((ix & 1) as f32, (ix & 2) as f32, (ix & 4) as f32)
+    Vec3::new((ix & 1) as f32, 
+              ((ix >> 1) & 1) as f32, 
+              ((ix >> 2) & 1) as f32)
 }
 
 fn above_center(v: &Vec3<f32>) -> Vec3<bool> {
