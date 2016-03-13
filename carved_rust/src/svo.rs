@@ -123,6 +123,7 @@ impl SVO {
             SVO::Voxel(_) => Some(hit_position),
             SVO::Octants(ref octants) => {
                 // work out which voxels are hit in turn, and if they're solid or not
+                // TODO: rather than trying dumbly, we could instead calculate which child is hit. Compare speeds?
                 let children : [(bool, bool, bool); 8] = {
                     let x = hit_position.x > 0.5;
                     let y = hit_position.y > 0.5;
@@ -162,12 +163,8 @@ impl SVO {
         })
     }
 
-
-    // TODO: write tests for this!
-    pub fn on_voxels(&self, on_voxel: fn(f32, f32, f32, i32, i32)) {
-        let on_voxel_vec = &|offset : Vec3<f32>, depth: i32, voxel_type: i32 |
-            { on_voxel(offset.x, offset.y, offset.z, depth, voxel_type) }; 
-        self.on_voxels_from(on_voxel_vec, zero(), 1);
+    pub fn on_voxels(&self, on_voxel: fn(Vec3<f32>, i32, i32)) {
+        self.on_voxels_from(&on_voxel, zero(), 0);
     }
 
     fn on_voxels_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
@@ -176,7 +173,7 @@ impl SVO {
             SVO::Voxel(voxel_type) => { on_voxel(origin, depth, voxel_type); }
             SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
                 let next_depth = depth + 1;
-                let offset = above_axis(ix) / next_depth as f32;
+                let offset = above_axis(ix) / ((1 << next_depth) as f32);
                 octant.on_voxels_from(on_voxel, origin + offset, next_depth);
             }   
         }

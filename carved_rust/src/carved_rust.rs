@@ -1,6 +1,7 @@
 use svo::SVO;
 
 use std::mem::transmute;
+use nalgebra::Vec3;
 
 #[no_mangle]
 pub extern "stdcall" fn svo_create(voxel_type: i32) -> *mut SVO {
@@ -29,7 +30,7 @@ pub extern "stdcall" fn svo_destroy(svo_ptr: *mut SVO) {
 }
 
 #[no_mangle]
-pub extern "stdcall" fn svo_on_voxels(svo_ptr: *mut SVO, on_voxel: fn(f32, f32, f32, i32, i32) -> ()) {
+pub extern "stdcall" fn svo_on_voxels(svo_ptr: *mut SVO, on_voxel: fn(Vec3<f32>, i32, i32) -> ()) {
 	let svo_ref: &SVO = unsafe { &*svo_ptr };
 	svo_ref.on_voxels(on_voxel);
 	println!("svo_on_voxels called with svo_ptr {:?} and on_voxel {:?}", svo_ptr, on_voxel);
