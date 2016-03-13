@@ -17,80 +17,21 @@ lazy_static! {
 
 #[test]
 fn on_blocks() {
-    use nalgebra::ApproxEq;
     use svo::SVO;
 
-    let mut svo = SVO::floor();
+    let svo = SVO::floor();
+    let expected = vec![
+        (0. , 0. , 0. , 2, 1),
+        (0.5, 0. , 0. , 2, 1),
+        (0. , 0.5, 0. , 2, 0),
+        (0.5, 0.5, 0. , 2, 0),
+        (0. , 0. , 0.5, 2, 1),
+        (0.5, 0. , 0.5, 2, 1),
+        (0. , 0.5, 0.5, 2, 0),
+        (0.5, 0.5, 0.5, 2, 0)];
 
     svo.on_voxels(test_function_pointer);
-
-    {
-        let ref results: Vec<(f32, f32, f32, i32, i32)> = *ARRAY.lock().unwrap();
-        let (x, y, z, depth, voxel_type) = results[0];
-        assert_approx_eq_eps!(x, 0., 0.01);
-        assert_approx_eq_eps!(y, 0., 0.01);
-        assert_approx_eq_eps!(z, 0., 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(1, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[1];
-        assert_approx_eq_eps!(x, 0.5, 0.01);
-        assert_approx_eq_eps!(y, 0., 0.01);
-        assert_approx_eq_eps!(z, 0., 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(1, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[2];
-        assert_approx_eq_eps!(x, 0., 0.01);
-        assert_approx_eq_eps!(y, 0.5, 0.01);
-        assert_approx_eq_eps!(z, 0., 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(0, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[3];
-        assert_approx_eq_eps!(x, 0.5, 0.01);
-        assert_approx_eq_eps!(y, 0.5, 0.01);
-        assert_approx_eq_eps!(z, 0., 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(0, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[4];
-        assert_approx_eq_eps!(x, 0., 0.01);
-        assert_approx_eq_eps!(y, 0., 0.01);
-        assert_approx_eq_eps!(z, 0.5, 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(1, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[5];
-        assert_approx_eq_eps!(x, 0.5, 0.01);
-        assert_approx_eq_eps!(y, 0., 0.01);
-        assert_approx_eq_eps!(z, 0.5, 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(1, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[6];
-        assert_approx_eq_eps!(x, 0., 0.01);
-        assert_approx_eq_eps!(y, 0.5, 0.01);
-        assert_approx_eq_eps!(z, 0.5, 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(0, voxel_type);
-
-        let (x, y, z, depth, voxel_type) = results[7];
-        assert_approx_eq_eps!(x, 0.5, 0.01);
-        assert_approx_eq_eps!(y, 0.5, 0.01);
-        assert_approx_eq_eps!(z, 0.5, 0.01);
-        assert_eq!(2, depth);
-        assert_eq!(0, voxel_type);
-    }
-
-    *ARRAY.lock().unwrap() = vec![];
-
-
-
-}
-
-fn test_function_pointer(x: f32, y: f32, z: f32, depth: i32, voxel_type: i32) {
-    ARRAY.lock().unwrap().push((x, y, z, depth, voxel_type));
+    produced_array(expected);
 }
 
 #[test]
@@ -138,4 +79,30 @@ fn test_ffi() {
 	let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
 	assert!(block_type_2 == 2);
 	carved_rust::svo_destroy(ptr);
+}
+
+fn produced_array(expected: Vec<(f32, f32, f32, i32, i32)>) {
+    use nalgebra::ApproxEq;
+
+    {
+        let ref results: Vec<(f32, f32, f32, i32, i32)> = *ARRAY.lock().unwrap();
+        assert_eq!(results.len(), expected.len());
+
+        for (actual_element, expected_element) in results.iter().zip(expected.iter()) {
+            let &(x, y, z, depth, voxel_type) = actual_element;
+            let &(x_, y_, z_, depth_, voxel_type_) = expected_element;
+
+            assert_approx_eq_eps!(x, x_, 0.01);
+            assert_approx_eq_eps!(y, y_, 0.01);
+            assert_approx_eq_eps!(z, z_, 0.01);
+            assert_eq!(depth, depth_);
+            assert_eq!(voxel_type, voxel_type_);
+        }
+    }
+
+    *ARRAY.lock().unwrap() = vec![];
+}
+
+fn test_function_pointer(x: f32, y: f32, z: f32, depth: i32, voxel_type: i32) {
+    ARRAY.lock().unwrap().push((x, y, z, depth, voxel_type));
 }
