@@ -1,7 +1,7 @@
 use svo::SVO;
 
 use std::mem::transmute;
-use nalgebra::Vec3;
+use nalgebra::{Vec3, zero};
 
 #[no_mangle]
 pub extern "stdcall" fn svo_create(voxel_type: i32) -> *mut SVO {
@@ -33,5 +33,20 @@ pub extern "stdcall" fn svo_destroy(svo_ptr: *mut SVO) {
 pub extern "stdcall" fn svo_on_voxels(svo_ptr: *mut SVO, on_voxel: fn(Vec3<f32>, i32, i32) -> ()) {
 	let svo_ref: &SVO = unsafe { &*svo_ptr };
 	svo_ref.on_voxels(on_voxel);
-	println!("svo_on_voxels called with svo_ptr {:?} and on_voxel {:?}", svo_ptr, on_voxel);
+}
+
+#[repr(C)]
+pub struct BadOption<T : Sized> {
+	is_some : bool,
+	value : T
+}
+
+#[no_mangle]
+pub extern "stdcall" fn svo_cast_ray(svo_ptr: *mut SVO, ray_origin: Vec3<f32>, ray_dir: Vec3<f32>) -> BadOption<Vec3<f32>> {
+	let svo_ref: &SVO = unsafe { &*svo_ptr };
+	let maybe_hit = svo_ref.cast_ray(ray_origin, ray_dir);
+	BadOption {
+		is_some: maybe_hit.is_some(),
+		value: maybe_hit.unwrap_or(zero())
+	}
 }
