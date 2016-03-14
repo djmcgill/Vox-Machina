@@ -3,25 +3,54 @@ using System.Collections;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
-public class SVO {
+public class SVO : IDisposable
+{
 	private const int DEFAULT_BLOCK_TYPE = 1;
 	private IntPtr svoPtr;
+	private bool disposed = false;
 
-	public SVO() {
+	// Public interface
+	public SVO()
+	{
 		svoPtr = svo_create(DEFAULT_BLOCK_TYPE);
+	}
+
+	public void Dispose ()
+	{
+		// Dispose of unmanaged resources.
+		Dispose(true);
+		// Suppress finalization.
+		GC.SuppressFinalize(this);
+
+	}
+
+	private void Dispose(Boolean disposing)
+	{
+		if (disposed)
+			return;
+		svo_destroy (svoPtr);
+	}
+
+	~SVO()
+	{
+		Dispose(false);
 	}
 
 	public delegate void OnBlocksCallback(Vector3 vec, int depth, int voxelType);
 
-	// Will return null if the ray misses.
-	public Nullable<Vector3> castRay(Vector3 rayOrigin, Vector3 rayDirection) {
+	/// Will return null if the ray misses.
+	public Nullable<Vector3> CastRay(Vector3 rayOrigin, Vector3 rayDirection)
+	{
 		var rustOrigin = new Vec3 (rayOrigin.x, rayOrigin.y, rayOrigin.z);
 		var rustDir = new Vec3 (rayDirection.x, rayDirection.y, rayDirection.z);
 		var maybeHit = svo_cast_ray (svoPtr, rustOrigin, rustDir);
-		if (maybeHit.isSome) {
+		if (maybeHit.isSome) 
+		{
 			var vec = maybeHit.value;
 			return new Vector3 (vec.x, vec.y, vec.z);
-		} else {
+		}
+		else
+		{
 			return null;
 		}
 	}
@@ -34,16 +63,18 @@ public class SVO {
 	[DllImport("libcarved_rust")]
 	private static extern void svo_destroy(IntPtr svo);
 
-	private delegate void On_Blocks_Callback(Vec3 vec, int depth, int voxel_type);
+	private delegate void RustOnBlocksCallback(Vec3 vec, int depth, int voxel_type);
 
 	[DllImport("libcarved_rust")]
-	private static extern void svo_on_voxels(IntPtr svo, On_Blocks_Callback onBlocks);
+	private static extern void svo_on_voxels(IntPtr svo, RustOnBlocksCallback onBlocks);
 
 	[StructLayout(LayoutKind.Sequential)]
-	private struct Vec3 {
+	private struct Vec3
+	{
 		public float x, y, z;
 
-		public Vec3(float _x, float _y, float _z) {
+		public Vec3(float _x, float _y, float _z)
+		{
 			x = _x;
 			y = _y;
 			z = _z;
@@ -51,7 +82,8 @@ public class SVO {
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
-	private struct BadOptionVec3 {
+	private struct BadOptionVec3
+	{
 		public bool isSome;
 		public Vec3 value;
 	}
