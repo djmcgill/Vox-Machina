@@ -1,8 +1,6 @@
-
-use carved_rust;
 use nalgebra::Vec3;
 use std::sync::Mutex;
-use svo::*;
+use svo::SVO;
 
 lazy_static! {
     static ref ARRAY: Mutex<Vec<(f32, f32, f32, i32, i32)>> = Mutex::new(Vec::new());
@@ -58,9 +56,6 @@ fn setting_blocks() {
 
 #[test]
 fn ray_casting() {
-	use svo::SVO;
-	use nalgebra::{ApproxEq, Vec3};
-    
     let svo = SVO::floor();
 
     let hit1 = svo.cast_ray(Vec3::new(0.5, 2., 0.5), Vec3::new(0., -1., 0.));
