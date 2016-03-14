@@ -65,6 +65,11 @@ public class SVO : IDisposable
 		}
 	}
 
+	public void SetBlock (Byte[] index, int newBlockType)
+	{
+		svo_set_block (svoPtr, index, (UIntPtr)index.Length, newBlockType);
+	}
+
 
 	// FFI interface
 	[DllImport("libcarved_rust")]
@@ -100,5 +105,8 @@ public class SVO : IDisposable
 
 	[DllImport("libcarved_rust")]
 	private static extern BadOptionVec3 svo_cast_ray (IntPtr svo, Vec3 rayOrigin, Vec3 rayDir);
+
+	[DllImport("libcarved_rust")]
+	private static extern void svo_set_block (IntPtr svo, Byte[] indexPtr, UIntPtr indexLen, int newBlockType);
 }
 

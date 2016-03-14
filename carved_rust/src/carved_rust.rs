@@ -1,6 +1,7 @@
 use svo::SVO;
 
 use std::mem::transmute;
+use std::slice;
 use nalgebra::{Vec3, zero};
 
 // FFI INTERFACE
@@ -29,6 +30,12 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const SVO, ray_origin: Vec3<f32>,
 	BadOption::new(maybe_hit, zero())
 }
 
+#[no_mangle]
+pub extern "stdcall" fn svo_set_block(svo_ptr: *mut SVO, index_ptr: *const u8, index_len: usize, new_block_type: i32) {
+	let svo_ref: &mut SVO = unsafe { &mut *svo_ptr };
+	let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
+	svo_ref.set_block_and_recombine(index, new_block_type);
+}
 
 // UTILS
 #[repr(C)]
