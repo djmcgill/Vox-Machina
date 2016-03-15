@@ -170,7 +170,10 @@ impl SVO {
     fn on_voxels_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
         where F : Fn(Vec3<f32>, i32, i32) {
         match *self {
-            SVO::Voxel(voxel_type) => { on_voxel(origin, depth, voxel_type); }
+            SVO::Voxel(voxel_type) => { 
+                println!("from Rust {:?} {:?} {:?}", origin, depth, voxel_type);
+                on_voxel(origin, depth, voxel_type); 
+            }
             SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
                 let next_depth = depth + 1;
                 let offset = above_axis(ix) / ((1 << next_depth) as f32);

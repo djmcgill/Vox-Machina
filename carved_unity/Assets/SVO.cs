@@ -42,6 +42,7 @@ public class SVO : IDisposable
 	public void OnBlocks (OnBlocksCallback onBlocks)
 	{
 		RustOnBlocksCallback rustOnBlocks = (Vec3 vec, int depth, int voxelType) => {
+			Console.WriteLine("from C# " + vec + " " + depth + " " + voxelType);
 			var vector = new Vector3 (vec.x, vec.y, vec.z);
 			onBlocks (vector, depth, voxelType);
 		};
