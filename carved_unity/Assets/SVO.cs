@@ -42,7 +42,6 @@ public class SVO : IDisposable
 	public void OnBlocks (OnBlocksCallback onBlocks)
 	{
 		RustOnBlocksCallback rustOnBlocks = (Vec3 vec, int depth, int voxelType) => {
-			Console.WriteLine("from C# " + vec + " " + depth + " " + voxelType);
 			var vector = new Vector3 (vec.x, vec.y, vec.z);
 			onBlocks (vector, depth, voxelType);
 		};
@@ -52,9 +51,12 @@ public class SVO : IDisposable
 	/// Will return null if the ray misses.
 	public Nullable<Vector3> CastRay (Vector3 rayOrigin, Vector3 rayDirection)
 	{
+		Console.WriteLine (String.Format ("about to call cast ray on {2} with {0} {1}", rayOrigin, rayDirection, svoPtr));
 		var rustOrigin = new Vec3 (rayOrigin.x, rayOrigin.y, rayOrigin.z);
 		var rustDir = new Vec3 (rayDirection.x, rayDirection.y, rayDirection.z);
+		Console.WriteLine ("really calling it");
 		var maybeHit = svo_cast_ray (svoPtr, rustOrigin, rustDir);
+		Console.WriteLine (String.Format ("maybeHit {0}", maybeHit));
 		if (maybeHit.isSome) 
 		{
 			var vec = maybeHit.value;
@@ -65,6 +67,24 @@ public class SVO : IDisposable
 			return null;
 		}
 	}
+	//private static extern BadOptionVec3 svo_cast_ray_float (IntPtr svo, float ox, float oy, float oz, float dx, float dy, float dz);
+	public Nullable<Vector3> CastRayFloat (float ox, float oy, float oz, float dx, float dy, float dz)
+	{
+		Console.WriteLine ("really calling float version of it");
+		Console.WriteLine ("{0} {1} {2} {3} {4} {5} {6}", svoPtr, ox, oy, oz, dx, dy, dz);
+		var maybeHit = svo_cast_ray_float (svoPtr, (int)ox, (int)oy, (int)oz, (int)dx, (int)dy, (int)dz);
+		Console.WriteLine (String.Format ("maybeHit {0}", maybeHit));
+		if (maybeHit.isSome) 
+		{
+			var vec = maybeHit.value;
+			return new Vector3 (vec.x, vec.y, vec.z);
+		}
+		else
+		{
+			return null;
+		}
+	}
+
 
 	public void SetBlock (Byte[] index, int newBlockType)
 	{
@@ -106,6 +126,11 @@ public class SVO : IDisposable
 
 	[DllImport("libcarved_rust")]
 	private static extern BadOptionVec3 svo_cast_ray (IntPtr svo, Vec3 rayOrigin, Vec3 rayDir);
+
+	[DllImport("libcarved_rust")]
+	private static extern BadOptionVec3 svo_cast_ray_float (IntPtr svo, int ox, int oy, int oz, int dx, int dy, int dz);
+
+
 
 	[DllImport("libcarved_rust")]
 	private static extern void svo_set_block (IntPtr svo, Byte[] indexPtr, UIntPtr indexLen, int newBlockType);

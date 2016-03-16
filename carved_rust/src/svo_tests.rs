@@ -1,10 +1,8 @@
-use nalgebra::Vec3;
-use std::sync::Mutex;
+use nalgebra::{ApproxEq, Vec3};
+use std::cell::RefCell;
 use svo::SVO;
 
-lazy_static! {
-    static ref ARRAY: Mutex<Vec<(f32, f32, f32, i32, i32)>> = Mutex::new(Vec::new());
-}
+// use carved_rust;
 
 #[test]
 fn on_blocks() {
@@ -19,6 +17,24 @@ fn on_blocks() {
         (0. , 0.5, 0.5, 1, 0),
         (0.5, 0.5, 0.5, 1, 0)]);
 }
+
+#[test]
+fn minimal_subdivide() {
+    let mut svo = SVO::new_voxel(1);
+    svo.set_block_and_recombine(&[1], 0);
+
+    assert_contains(&svo, vec![
+        (0. , 0. , 0. , 1, 1),
+        (0.5, 0. , 0. , 1, 0),
+        (0. , 0.5, 0. , 1, 1),
+        (0.5, 0.5, 0. , 1, 1),
+        (0. , 0. , 0.5, 1, 1),
+        (0.5, 0. , 0.5, 1, 1),
+        (0. , 0.5, 0.5, 1, 1),
+        (0.5, 0.5, 0.5, 1, 1)]);
+}
+
+
 
 #[test]
 fn setting_blocks() {
@@ -74,22 +90,28 @@ fn ray_casting() {
     assert!(no_hit1.is_none());
 }
 
-#[test]
-fn test_ffi() {
-	let ptr = carved_rust::svo_create(1);
-	let block_type_1 = carved_rust::svo_get_voxel_type(ptr);
-	assert!(block_type_1 == 1);
-	carved_rust::svo_set_voxel_type(ptr, 2);
-	let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
-	assert!(block_type_2 == 2);
-	carved_rust::svo_destroy(ptr);
-}
+// #[test]
+// fn test_ffi() {
+// 	let ptr = carved_rust::svo_create(1);
+// 	let block_type_1 = carved_rust::svo_get_voxel_type(ptr);
+// 	assert!(block_type_1 == 1);
+// 	carved_rust::svo_set_voxel_type(ptr, 2);
+// 	let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
+// 	assert!(block_type_2 == 2);
+// 	carved_rust::svo_destroy(ptr);
+// }
 
 fn assert_contains(svo: &SVO, expected: Vec<(f32, f32, f32, i32, i32)>) {
     use nalgebra::ApproxEq;
 
-    svo.on_voxels(test_function_pointer); 
-    let ref mut results = *ARRAY.lock().unwrap();
+    let results_vec: RefCell<Vec<(f32, f32, f32, i32, i32)>> = RefCell::new(Vec::new());
+
+    svo.on_voxels(&|vec: Vec3<f32>, depth: i32, voxel_type: i32|  {
+        results_vec.borrow_mut().push((vec.x, vec.y, vec.z, depth, voxel_type));
+    }); 
+         
+    let results = results_vec.into_inner();
+
     assert_eq!(results.len(), expected.len());
 
     for (actual_element, expected_element) in results.iter().zip(expected.iter()) {
@@ -102,10 +124,4 @@ fn assert_contains(svo: &SVO, expected: Vec<(f32, f32, f32, i32, i32)>) {
         assert_eq!(depth, depth_);
         assert_eq!(voxel_type, voxel_type_);
     }
-
-    *results = vec![];
-}
-
-fn test_function_pointer(vec: Vec3<f32>, depth: i32, voxel_type: i32) {
-    ARRAY.lock().unwrap().push((vec.x, vec.y, vec.z, depth, voxel_type));
 }

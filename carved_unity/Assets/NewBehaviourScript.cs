@@ -5,32 +5,53 @@ using System.Runtime.InteropServices;
 
 public class NewBehaviourScript : MonoBehaviour
 {
-
+	public Camera camera;
 	public Transform test;
 	public int numberOfObjects = 20;
 	public float radius = 20f;
 
+	SVO svo;
+
     void Start()
 	{
         print("Starting");
-		var svo = new SVO();
+		svo = new SVO();
+
+		svo.SetBlock(new byte[] { 2 }, 0);
+		svo.SetBlock(new byte[] { 3 }, 0);
+		svo.SetBlock(new byte[] { 6 }, 0);
+		svo.SetBlock(new byte[] { 7 }, 0);
 
 		SVO.OnBlocksCallback callback = (Vector3 vec, int depth, int voxelType) => {
-			print(vec);
-			print(depth);
-			print(voxelType);
+			if (voxelType != 0)
+			{
+				print(String.Format("Vec: ( {0}, {1}, {2} ) depth: {3} type: {4}", vec.x, vec.y, vec.z, depth, voxelType));
+				var obj = (Transform)Instantiate(test, vec, Quaternion.identity);
+				float scale = (float) Math.Pow(2, -depth);
+				obj.localScale = new Vector3(scale, scale, scale);
+			}
 		};
 
 		svo.OnBlocks (callback);
 
-		for (int i = 0; i < numberOfObjects; i++) {
-			float angle = i * Mathf.PI * 2 / numberOfObjects;
-			Vector3 pos = new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * radius;
-			Instantiate(test, pos, Quaternion.identity);
-		}
-
         print("finished startup");
-
-
     }
+
+	void Update()
+	{
+		Ray cameraRay = camera.ScreenPointToRay (Input.mousePosition);
+		print (String.Format ("calling castray with ({0}, {1}, {2}) ({3}, {4}, {5})", 
+			cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z,
+			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z));
+		var maybeHitPos = svo.CastRayFloat (cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z, 
+			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z);
+		print(String.Format("returned: {0}", maybeHitPos));
+
+		if (maybeHitPos.HasValue)
+		{
+			var hitPos = maybeHitPos.Value;
+			print (String.Format ("Ray hit at: ({0}, {1}, {2})", hitPos.x, hitPos.y, hitPos.z));
+		}
+			
+	}
 }

@@ -163,7 +163,7 @@ impl SVO {
         })
     }
 
-    pub fn on_voxels(&self, on_voxel: fn(Vec3<f32>, i32, i32)) {
+    pub fn on_voxels<F>(&self, on_voxel: &F) where F : Fn(Vec3<f32>, i32, i32) {
         self.on_voxels_from(&on_voxel, zero(), 0);
     }
 
@@ -171,7 +171,6 @@ impl SVO {
         where F : Fn(Vec3<f32>, i32, i32) {
         match *self {
             SVO::Voxel(voxel_type) => { 
-                println!("from Rust {:?} {:?} {:?}", origin, depth, voxel_type);
                 on_voxel(origin, depth, voxel_type); 
             }
             SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
