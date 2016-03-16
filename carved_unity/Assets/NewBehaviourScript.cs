@@ -39,6 +39,7 @@ public class NewBehaviourScript : MonoBehaviour
 
 	void Update()
 	{
+		if (svo == null) {print("svo was null"); return;}
 		Ray cameraRay = camera.ScreenPointToRay (Input.mousePosition);
 		print (String.Format ("calling castray with ({0}, {1}, {2}) ({3}, {4}, {5})", 
 			cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z,
