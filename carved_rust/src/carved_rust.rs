@@ -39,14 +39,14 @@ pub extern "stdcall" fn svo_set_block(svo_ptr: *mut SVO, index_ptr: *const u8, i
 // UTILS
 #[repr(C)] #[derive(Debug)]
 pub struct BadOption<T : Sized> {
-	pub is_some : bool,
+	pub is_some : i32,
 	pub value : T
 }
 
 impl<T : Sized> BadOption<T> {
 	fn new(maybe_value: Option<T>, default: T) -> BadOption<T> {
 		BadOption {
-			is_some: maybe_value.is_some(),
+			is_some: maybe_value.is_some() as i32,
 			value: maybe_value.unwrap_or(default)
 		}
 	}

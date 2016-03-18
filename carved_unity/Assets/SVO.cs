@@ -60,7 +60,7 @@ public class SVO : IDisposable
 			
 		var maybeHit = svo_cast_ray (svoPtr, rustOrigin, rustDir);
 
-		if (maybeHit.isSome)
+		if (maybeHit.isSome != 0)
 		{
 			return new Vector3 (maybeHit.x, maybeHit.y, maybeHit.z);
 		}
@@ -100,7 +100,7 @@ public class SVO : IDisposable
 	[StructLayout(LayoutKind.Sequential)]
 	private struct BadOptionVec3
 	{
-		public bool isSome;
+		public int isSome;
 		public float x;
 		public float y;
 		public float z;

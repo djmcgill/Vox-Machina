@@ -149,11 +149,11 @@ fn ff_integration() {
     }
 
     let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(0.52, 2., 0.52), Vec3::new(0., -1., 0.));
-    assert!(maybe_hit.is_some);
+    assert!(maybe_hit.is_some != 0);
     assert_approx_eq_eps!(maybe_hit.value, Vec3::new(0.52, 1., 0.52), 0.001);
 
     let maybe_hit2 = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(1.52, 2., 0.52), Vec3::new(0., -1., 0.));
-    assert!(!maybe_hit2.is_some);
+    assert!(maybe_hit2.is_some == 0);
 
     carved_rust::svo_destroy(svo_ptr);
 }
@@ -175,5 +175,5 @@ fn causes_unity_crash() {
     carved_rust::svo_set_block(svo_ptr, ix4.as_ptr(), ix4.len(), 0);
 
     let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(3.268284, 1.900771, -9.700012), Vec3::new(0., 0., 1.));
-    assert!(!maybe_hit.is_some);
+    assert!(maybe_hit.is_some == 0);
 }
