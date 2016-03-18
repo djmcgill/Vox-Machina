@@ -1,9 +1,9 @@
+use carved_rust;
 use nalgebra::{ApproxEq, Vec3};
 use std::cell::RefCell;
 use svo::SVO;
 
-// use carved_rust;
-
+// === SVO tests ====
 #[test]
 fn on_blocks() {
     let svo = SVO::floor();
@@ -102,8 +102,6 @@ fn ray_casting() {
 // }
 
 fn assert_contains(svo: &SVO, expected: Vec<(f32, f32, f32, i32, i32)>) {
-    use nalgebra::ApproxEq;
-
     let results_vec: RefCell<Vec<(f32, f32, f32, i32, i32)>> = RefCell::new(Vec::new());
 
     svo.on_voxels(&|vec: Vec3<f32>, depth: i32, voxel_type: i32|  {
@@ -124,4 +122,58 @@ fn assert_contains(svo: &SVO, expected: Vec<(f32, f32, f32, i32, i32)>) {
         assert_eq!(depth, depth_);
         assert_eq!(voxel_type, voxel_type_);
     }
+}
+
+
+// === FFI tests ===
+#[test]
+fn ff_integration() {
+    let svo_ptr = carved_rust::svo_create(1);
+
+    let index = &[1u8];
+    carved_rust::svo_set_block(svo_ptr, index.as_ptr(), index.len(), 2);
+
+    // I can't actually (be bothered to) produce a extern "stdcall" fn(Vec3<f32>, i32, i32)
+    // so cheat and replicate the code from carved_rust::on_voxels. Luckily (by design) it's a shallow wrapper.
+    {
+        let svo_ref: &SVO = unsafe { &*svo_ptr };
+        assert_contains(svo_ref, vec![
+            (0. , 0. , 0. , 1, 1),
+            (0.5, 0. , 0. , 1, 2),
+            (0. , 0.5, 0. , 1, 1),
+            (0.5, 0.5, 0. , 1, 1),
+            (0. , 0. , 0.5, 1, 1),
+            (0.5, 0. , 0.5, 1, 1),
+            (0. , 0.5, 0.5, 1, 1),
+            (0.5, 0.5, 0.5, 1, 1)]);
+    }
+
+    let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(0.52, 2., 0.52), Vec3::new(0., -1., 0.));
+    assert!(maybe_hit.is_some);
+    assert_approx_eq_eps!(maybe_hit.value, Vec3::new(0.52, 1., 0.52), 0.001);
+
+    let maybe_hit2 = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(1.52, 2., 0.52), Vec3::new(0., -1., 0.));
+    assert!(!maybe_hit2.is_some);
+
+    carved_rust::svo_destroy(svo_ptr);
+}
+
+#[test]
+fn causes_unity_crash() {
+    let svo_ptr = carved_rust::svo_create(1);
+
+    let ix1 = &[2u8];
+    carved_rust::svo_set_block(svo_ptr, ix1.as_ptr(), ix1.len(), 0);
+
+    let ix2 = &[3u8];
+    carved_rust::svo_set_block(svo_ptr, ix2.as_ptr(), ix2.len(), 0);
+
+    let ix3 = &[6u8];
+    carved_rust::svo_set_block(svo_ptr, ix3.as_ptr(), ix3.len(), 0);
+
+    let ix4 = &[7u8];
+    carved_rust::svo_set_block(svo_ptr, ix4.as_ptr(), ix4.len(), 0);
+
+    let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(3.268284, 1.900771, -9.700012), Vec3::new(0., 0., 1.));
+    assert!(!maybe_hit.is_some);
 }

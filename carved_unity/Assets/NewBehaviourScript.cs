@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 
 public class NewBehaviourScript : MonoBehaviour
 {
-	public Camera camera;
+	new public Camera camera;
 	public Transform test;
 	public int numberOfObjects = 20;
 	public float radius = 20f;
@@ -21,6 +21,13 @@ public class NewBehaviourScript : MonoBehaviour
 		svo.SetBlock(new byte[] { 3 }, 0);
 		svo.SetBlock(new byte[] { 6 }, 0);
 		svo.SetBlock(new byte[] { 7 }, 0);
+
+		var orig = new Vector3 (3.268284f, 1.900771f, -9.700012f);
+		var dir = new Vector3 (0f, 0f, 1f);
+		print ("about to cast ray");
+		var maybeHitPos = svo.CastRay (orig, dir);
+		print ("succesfully cast ray");
+		print (String.Format("ray returned {0}", maybeHitPos));
 
 		SVO.OnBlocksCallback callback = (Vector3 vec, int depth, int voxelType) => {
 			if (voxelType != 0)
@@ -40,19 +47,19 @@ public class NewBehaviourScript : MonoBehaviour
 	void Update()
 	{
 		if (svo == null) {print("svo was null"); return;}
-		Ray cameraRay = camera.ScreenPointToRay (Input.mousePosition);
-		print (String.Format ("calling castray with ({0}, {1}, {2}) ({3}, {4}, {5})", 
-			cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z,
-			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z));
-		var maybeHitPos = svo.CastRayFloat (cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z, 
-			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z);
-		print(String.Format("returned: {0}", maybeHitPos));
-
-		if (maybeHitPos.HasValue)
-		{
-			var hitPos = maybeHitPos.Value;
-			print (String.Format ("Ray hit at: ({0}, {1}, {2})", hitPos.x, hitPos.y, hitPos.z));
-		}
-			
+//		Ray cameraRay = camera.ScreenPointToRay (Input.mousePosition);
+//		print (String.Format ("calling castray with ({0}, {1}, {2}) ({3}, {4}, {5})", 
+//			cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z,
+//			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z));
+//		var maybeHitPos = svo.CastRayFloat (cameraRay.origin.x, cameraRay.origin.y, cameraRay.origin.z, 
+//			cameraRay.direction.x, cameraRay.direction.y, cameraRay.direction.z);
+//		print(String.Format("returned: {0}", maybeHitPos));
+//
+//		if (maybeHitPos.HasValue)
+//		{
+//			var hitPos = maybeHitPos.Value;
+//			print (String.Format ("Ray hit at: ({0}, {1}, {2})", hitPos.x, hitPos.y, hitPos.z));
+//		}
+//			
 	}
 }
