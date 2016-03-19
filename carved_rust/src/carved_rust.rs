@@ -7,7 +7,7 @@ use nalgebra::{Vec3, zero};
 // FFI INTERFACE
 #[no_mangle]
 pub extern "stdcall" fn svo_create<'a>
-    (voxel_type: i32, 
+    (voxel_type: i32,
      register_voxel_extern: extern "stdcall" fn(Vec3<f32>, i32, i32) -> u32,
      deregister_voxel_extern: extern "stdcall" fn(u32)
     ) -> *mut ExternalSVO<'a> {
@@ -39,7 +39,7 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const ExternalSVO, ray_origin: Ve
 pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_block_type: i32) {
     let svo_ref: &mut ExternalSVO = unsafe { &mut *svo_ptr };
     let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
-    svo_ref.svo.set_block_and_recombine(&svo_ref.deregister_voxel, &svo_ref.register_voxel, index, new_block_type);
+    svo_ref.svo.set_block(&svo_ref.deregister_voxel, &svo_ref.register_voxel, index, new_block_type);
 }
 
 // UTILS

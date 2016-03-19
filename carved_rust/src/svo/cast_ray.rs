@@ -1,6 +1,5 @@
 use nalgebra::{Vec3, Norm, Iterable};
 use svo::*;
-use svo::utils::*;
 
 impl SVO {
     // Cast a ray into the octree and return the position of collision with a non-type-zero voxel (if any).
@@ -45,7 +44,6 @@ impl SVO {
 
                 // TODO: stop throwing away the hit position between iterations - if it's on the "near" edge
                 //       then it's the same as for the nearer children
-                // TODO: also this should probably take &Vec3<bool> instead.
                 let test_child = |(above_x, above_y, above_z): (bool, bool, bool)| -> Option<Vec3<f32>> {
                     let (above_x, above_y, above_z) = (above_x as usize, above_y as usize, above_z as usize);
                     let child_ix = above_x | (above_y<<1) | (above_z<<2);
@@ -60,4 +58,20 @@ impl SVO {
             }
         }
     }
+}
+
+// TODO: test these specifically
+fn to_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
+    (vec - offsets*0.5)*2.
+}
+
+// TODO: test these specifically
+fn from_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
+    vec*0.5 + offsets*0.5
+}
+
+fn sorted_ts(ray_origin: f32, inv_ray_dir: f32) -> (f32, f32) {
+    let t1 = (0.-ray_origin) * inv_ray_dir;
+    let t2 = (1.-ray_origin) * inv_ray_dir;
+    if t1 < t2 { (t1, t2) } else { (t2, t1) }
 }

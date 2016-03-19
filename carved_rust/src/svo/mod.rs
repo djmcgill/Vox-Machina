@@ -1,4 +1,4 @@
-mod utils;
+use nalgebra::Vec3;
 
 pub mod cast_ray;
 pub mod set_block;
@@ -48,4 +48,16 @@ impl SVO {
             _ => None
         }
     }
+}
+
+// Returns a vector with either 0. or 1. as its elements
+fn above_axis(ix: u8) -> Vec3<f32> {
+    Vec3::new((ix & 1) as f32,
+              ((ix >> 1) & 1) as f32,
+              ((ix >> 2) & 1) as f32)
+}
+
+// Returns the new origin of the child at the given index in global space.
+pub fn offset(ix: u8, depth: i32) -> Vec3<f32> {
+    above_axis(ix) / ((1 << depth+1) as f32)
 }
