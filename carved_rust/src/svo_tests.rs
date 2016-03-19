@@ -34,8 +34,6 @@ fn minimal_subdivide() {
         (0.5, 0.5, 0.5, 1, 1)]);
 }
 
-
-
 #[test]
 fn setting_blocks() {
     let mut svo = SVO::floor();
@@ -92,13 +90,13 @@ fn ray_casting() {
 
 // #[test]
 // fn test_ffi() {
-// 	let ptr = carved_rust::svo_create(1);
-// 	let block_type_1 = carved_rust::svo_get_voxel_type(ptr);
-// 	assert!(block_type_1 == 1);
-// 	carved_rust::svo_set_voxel_type(ptr, 2);
-// 	let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
-// 	assert!(block_type_2 == 2);
-// 	carved_rust::svo_destroy(ptr);
+//  let ptr = carved_rust::svo_create(1);
+//  let block_type_1 = carved_rust::svo_get_voxel_type(ptr);
+//  assert!(block_type_1 == 1);
+//  carved_rust::svo_set_voxel_type(ptr, 2);
+//  let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
+//  assert!(block_type_2 == 2);
+//  carved_rust::svo_destroy(ptr);
 // }
 
 // TODO: just manually traverse the svo

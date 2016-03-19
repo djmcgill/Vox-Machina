@@ -1,95 +1,102 @@
 use nalgebra::*;
-use std::cell::Cell;
-use std::ops::{Index, IndexMut};
-
-pub struct ExternalSVO<'a> {
-    pub register_voxel: &'a Fn(Vec3<f32>, i32, i32) -> u32,
-    pub deregister_voxel: &'a Fn(u32),
-    pub svo: SVO
-}
-
 
 #[derive(Debug, PartialEq)]
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 pub enum SVO {
-    // At the moment a voxel only has a "type".
-    Voxel { voxel_type: i32,
-            external_id: Cell<Option<u32>> },
+    Voxel { voxel_type: i32, external_id: u32 },
 
-    // Each octant is addressed by the bit vector [z, y, x] 
-    // where the variables are booleans for if the octant is ABOVE the given axis.
-    // For example, the octant at index 6 (b110) is the cube with 0 <= x < 0.5, 
-    // 0.5 <= y < 1, and 0.5 <= z < 1.
-    // i.e. ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
-    Octants ([Box<SVO>; 8]) 
+    // For a given point (x, y, z), the index of its octant is
+    // ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
+    Octants ([Box<SVO>; 8])
 }
-// TODO: I'd like to implement Drop so that any voxel that gets deleted automatically
-//       gets undrawn but I can't figure out how to pass the deregister_voxel function around
 
 impl SVO {
-    pub fn new_voxel(voxel_type: i32) -> SVO {
-        SVO::Voxel { voxel_type: voxel_type, external_id: Cell::new(None)}
+    pub fn new_voxel(voxel_type: i32, external_id: u32) -> SVO {
+        SVO::Voxel { voxel_type: voxel_type, external_id: external_id }
     }
 
-    pub fn new_octants(octant_types: [i32; 8]) -> SVO {
-        // TODO: register the new voxels
-        let new_boxed_voxel = |ix| Box::new(SVO::new_voxel(octant_types[ix]));
-        SVO::Octants([new_boxed_voxel(0), new_boxed_voxel(1), new_boxed_voxel(2), new_boxed_voxel(3),
-                      new_boxed_voxel(4), new_boxed_voxel(5), new_boxed_voxel(6), new_boxed_voxel(7)])
+    pub fn new_octants<F>(make_octant: &F) -> SVO where F: Fn(u8) -> SVO {
+        SVO::Octants([
+            Box::new(make_octant(0)), Box::new(make_octant(1)),
+            Box::new(make_octant(2)), Box::new(make_octant(3)),
+            Box::new(make_octant(4)), Box::new(make_octant(5)),
+            Box::new(make_octant(6)), Box::new(make_octant(7))])
     }
 
-    // A SVO where the lower blocks (i.e. where y < 0.5) are filled.
-    pub fn floor() -> SVO { 
-        SVO::new_octants([1, 1, 0, 0, 1, 1, 0, 0])
-    }
-
-    // If the SVO is a Voxel, split it into octants. If it's already octants, panic.
-    fn subdivide_voxel<D>(&mut self, deregister_voxel: &D) where D : Fn(u32) {
-        match *self {
-            SVO::Voxel{ ref external_id, .. } => {
-                for voxel_id in external_id.get() {
-                    deregister_voxel(voxel_id)
-                };
+    fn subdivide_voxel<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
+                             origin: Vec3<f32>, depth: i32)
+            where D : Fn(u32), R : Fn(Vec3<f32>, i32, i32) -> u32 {
+        *self = match *self {
+            SVO::Voxel { external_id, voxel_type } => {
+                deregister_voxel(external_id);
+                SVO::new_octants(&|ix| {
+                    let uid = register_voxel(origin + offset(ix, depth), depth+1, voxel_type);
+                    SVO::new_voxel(voxel_type, uid)
+                })
             },
             _ => panic!("subdivide_voxel called on a non-voxel!")
-        }
+        };
+    }
 
-
-        match *self {
-            SVO::Voxel { voxel_type, .. } => {
-                *self = SVO::new_octants([voxel_type, voxel_type, voxel_type, voxel_type,
-                                          voxel_type, voxel_type, voxel_type, voxel_type])
+    fn recombine_octants<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
+                               origin: Vec3<f32>, depth: i32, voxel_type: i32)
+            where D : Fn(u32), R : Fn(Vec3<f32>, i32, i32) -> u32 {
+        *self = match *self {
+            SVO::Octants(ref mut octants) => {
+                for octant in octants { octant.deregister_all(deregister_voxel); }
+                let uid = register_voxel(origin, depth, voxel_type);
+                SVO::new_voxel(voxel_type, uid)
             },
-            _ => panic!("subdivide_voxel called on a non-voxel!")
+            _ => panic!("recombine_octants called on non-octants!")
         }
-    } 
+    }
+
+    fn deregister_all<D>(&mut self, deregister_voxel: &D) where D: Fn(u32) {
+        match *self {
+            SVO::Voxel { external_id, .. } => deregister_voxel(external_id),
+            SVO::Octants (ref mut octants) =>
+                for octant in octants { octant.deregister_all(deregister_voxel); }
+        }
+    }
 
     // Follow an index, splitting voxels as necessary. The set the block at the target to `Voxel(new_block_type)`.
     // Then go back up the tree, recombining if we've transformed all the octants in a node to the same voxel.
-    pub fn set_block_and_recombine<D>(&mut self, index: &[u8], new_block_type: i32, deregister_voxel: &D) 
-            where D : Fn(u32) {
+    pub fn set_block_and_recombine<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
+                                         index: &[u8], new_block_type: i32)
+        where D : Fn(u32), R : Fn(Vec3<f32>, i32, i32) -> u32 {
+            self.set_block_and_recombine_from(deregister_voxel, register_voxel, index, new_block_type, zero(), 0);
+
+    }
+
+    // TODO: could this recursion pattern be generalised?
+    fn set_block_and_recombine_from<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R, index: &[u8], new_block_type: i32, origin: Vec3<f32>, depth: i32)
+            where D : Fn(u32), R : Fn(Vec3<f32>, i32, i32) -> u32 {
         if let Some(block_type) = self.get_voxel_type() {
             if block_type == new_block_type {return;} // nothing to do
         }
 
         match index.split_first() {
             // Overwrite whatever's here with the new voxel.
-            None => *self = SVO::new_voxel(new_block_type), 
+            None => {
+                self.deregister_all(deregister_voxel);
+                let uid = register_voxel(origin, depth, new_block_type);
+                *self = SVO::new_voxel(new_block_type, uid);
+            },
 
             // We need to go deeper
-            Some((ix, rest)) => { 
+            Some((&ix, rest)) => {
                 // Voxels get split up
-                if self.get_voxel_type().is_some() { self.subdivide_voxel(deregister_voxel); } 
+                if self.get_voxel_type().is_some() { self.subdivide_voxel(deregister_voxel, register_voxel, origin, depth); }
 
                 {
                     let ref mut octants = self.get_mut_octants().unwrap();
                     // Insert into the sub_octant
-                    octants[*ix as usize].set_block_and_recombine(rest, new_block_type, deregister_voxel);
+                    octants[ix as usize].set_block_and_recombine_from(deregister_voxel, register_voxel, rest, new_block_type, origin + offset(ix, depth), depth+1);
                 }
 
                 // Then if we have 8 voxels of the same type, combine them.
                 if let Some(combined_block_type) = self.get_octants().and_then(SVO::combine_voxels) {
-                    *self = SVO::new_voxel(combined_block_type);
+                    self.recombine_octants(deregister_voxel, register_voxel, origin, depth, combined_block_type);
                 }
             }
         }
@@ -126,7 +133,7 @@ impl SVO {
     pub fn cast_ray(&self, ray_origin: Vec3<f32>, ray_dir: Vec3<f32>) -> Option<Vec3<f32>> {
         let eps = 0.001;
         let sanitise = |f: f32| if f.abs() < eps {eps * f.signum()} else {f};
-        let sanitised_dir = ray_dir.normalize().iter().map(|f| sanitise(*f)).collect();
+        let sanitised_dir = ray_dir.normalize().iter().cloned().map(sanitise).collect();
         let inv_dir = Vec3::new(1., 1., 1.)/sanitised_dir;
         self.cast_ray_sanitised(ray_origin, sanitised_dir, inv_dir)
     }
@@ -159,7 +166,7 @@ impl SVO {
                 };
 
                 // TODO: stop throwing away the hit position between iterations - if it's on the "near" edge
-                // then it's the same as for the nearer children
+                //       then it's the same as for the nearer children
                 // TODO: also this should probably take &Vec3<bool> instead.
                 let test_child = |(above_x, above_y, above_z): (bool, bool, bool)| -> Option<Vec3<f32>> {
                     let (above_x, above_y, above_z) = (above_x as usize, above_y as usize, above_z as usize);
@@ -170,7 +177,7 @@ impl SVO {
                         from_child_space(child_hit, above_center)
                     })
                 };
-                
+
                 children.iter().cloned().map(test_child).find(|x| x.is_some()).and_then(|x| x)
             }
         }
@@ -186,37 +193,11 @@ impl SVO {
             }
         })
     }
-
-    // TODO: This is a hack. We're still redrawing the whole tree each frame.
-    //       We should instead keep track somehow of whether or not we've the contents of a node.
-    pub fn redraw<F>(&self, on_voxel: &F) where F : Fn(Vec3<f32>, i32, i32) -> u32 {
-        self.redraw_from(&on_voxel, zero(), 0);
-    }
-
-    fn redraw_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
-        where F : Fn(Vec3<f32>, i32, i32) -> u32 {
-        match *self {
-            SVO::Voxel { voxel_type, ref external_id } => { 
-                if external_id.get().is_none() {
-                    let new_id = on_voxel(origin, depth, voxel_type); 
-                    external_id.set(Some(new_id));
-                }
-            }
-
-            SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
-                let next_depth = depth + 1;
-                let offset = above_axis(ix) / ((1 << next_depth) as f32);
-                octant.redraw_from(on_voxel, origin + offset, next_depth);
-            }   
-        }
-    }
 }
 
 fn sorted_ts(ray_origin: f32, inv_ray_dir: f32) -> (f32, f32) {
-    let min_cube_extent = 0.;
-    let max_cube_extent = 1.;
-    let t1 = (min_cube_extent-ray_origin) * inv_ray_dir;
-    let t2 = (max_cube_extent-ray_origin) * inv_ray_dir;
+    let t1 = (0.-ray_origin) * inv_ray_dir;
+    let t2 = (1.-ray_origin) * inv_ray_dir;
     if t1 < t2 { (t1, t2) } else { (t2, t1) }
 }
 
@@ -230,38 +211,15 @@ fn from_child_space(vec: Vec3<f32>, offsets: Vec3<f32>) -> Vec3<f32> {
     vec*0.5 + offsets*0.5
 }
 
-// returns a vector with either 0. or 1. as its elements
-fn above_axis(ix: usize) -> Vec3<f32> {
-    Vec3::new((ix & 1) as f32, 
-              ((ix >> 1) & 1) as f32, 
+// Returns a vector with either 0. or 1. as its elements
+fn above_axis(ix: u8) -> Vec3<f32> {
+    Vec3::new((ix & 1) as f32,
+              ((ix >> 1) & 1) as f32,
               ((ix >> 2) & 1) as f32)
 }
 
-fn above_center(v: &Vec3<f32>) -> Vec3<bool> {
-    Vec3::new(v.x > 0.5, v.y > 0.5, v.z > 0.5)
-}
 
-impl<'a> Index<&'a [u8]> for SVO {
-    type Output = SVO;
-    fn index(&self, index: &[u8]) -> &SVO {
-        match index.split_first() {
-            None => self,
-            Some((ix, rest)) => match *self {
-                SVO::Voxel { .. } => panic!("Index {:?} is too long!", index),
-                SVO::Octants(ref octants) => octants[*ix as usize].index(rest)
-            }                
-        }
-    }
-}
-
-impl<'a> IndexMut<&'a [u8]> for SVO {
-    fn index_mut(&mut self, index: &[u8]) -> &mut SVO {
-        match index.split_first() {
-            None => self,
-            Some((ix, rest)) => match *self {
-                SVO::Voxel { .. } => panic!("Index {:?} is too long!", index),
-                SVO::Octants(ref mut octants) => octants[*ix as usize].index_mut(rest)
-            }
-        }
-    }
+// Returns the new origin of the child at the given index in global space.
+fn offset(ix: u8, depth: i32) -> Vec3<f32> {
+    above_axis(ix) / ((1 << depth+1) as f32)
 }
