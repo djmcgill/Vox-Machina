@@ -54,7 +54,7 @@ fn setting_blocks() {
         (0. , 0. , 0.5, 1, 1),
         (0.5, 0. , 0.5, 1, 1),
         (0. , 0.5, 0.5, 1, 0),
-        (0.5, 0.5, 0.5, 1, 0)]);   
+        (0.5, 0.5, 0.5, 1, 0)]);
 
     svo.set_block_and_recombine(&[1, 3], 1);
     assert_contains(&svo, vec![
@@ -65,7 +65,7 @@ fn setting_blocks() {
         (0. , 0. , 0.5, 1, 1),
         (0.5, 0. , 0.5, 1, 1),
         (0. , 0.5, 0.5, 1, 0),
-        (0.5, 0.5, 0.5, 1, 0)]); 
+        (0.5, 0.5, 0.5, 1, 0)]);
 }
 
 #[test]
@@ -105,8 +105,8 @@ fn assert_contains(svo: &SVO, expected: Vec<(f32, f32, f32, i32, i32)>) {
 
     // svo.on_voxels(&|vec: Vec3<f32>, depth: i32, voxel_type: i32|  {
     //     results_vec.borrow_mut().push((vec.x, vec.y, vec.z, depth, voxel_type));
-    // }); 
-         
+    // });
+
     // let results = results_vec.into_inner();
 
     // assert_eq!(results.len(), expected.len());
