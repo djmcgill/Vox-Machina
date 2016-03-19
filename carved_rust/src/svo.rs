@@ -1,11 +1,20 @@
 use nalgebra::*;
+use std::cell::Cell;
 use std::ops::{Index, IndexMut};
+
+pub struct ExternalSVO<'a> {
+    pub register_voxel: &'a Fn(Vec3<f32>, i32, i32) -> u32,
+    pub deregister_voxel: &'a Fn(u32),
+    pub svo: SVO
+}
+
 
 #[derive(Debug, PartialEq)]
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 pub enum SVO {
     // At the moment a voxel only has a "type".
-    Voxel (i32),
+    Voxel { voxel_type: i32,
+            external_id: Cell<Option<u32>> },
 
     // Each octant is addressed by the bit vector [z, y, x] 
     // where the variables are booleans for if the octant is ABOVE the given axis.
@@ -14,13 +23,16 @@ pub enum SVO {
     // i.e. ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
     Octants ([Box<SVO>; 8]) 
 }
+// TODO: I'd like to implement Drop so that any voxel that gets deleted automatically
+//       gets undrawn but I can't figure out how to pass the deregister_voxel function around
 
 impl SVO {
-    pub fn new_voxel(block_type: i32) -> SVO {
-        SVO::Voxel(block_type)
+    pub fn new_voxel(voxel_type: i32) -> SVO {
+        SVO::Voxel { voxel_type: voxel_type, external_id: Cell::new(None)}
     }
 
     pub fn new_octants(octant_types: [i32; 8]) -> SVO {
+        // TODO: register the new voxels
         let new_boxed_voxel = |ix| Box::new(SVO::new_voxel(octant_types[ix]));
         SVO::Octants([new_boxed_voxel(0), new_boxed_voxel(1), new_boxed_voxel(2), new_boxed_voxel(3),
                       new_boxed_voxel(4), new_boxed_voxel(5), new_boxed_voxel(6), new_boxed_voxel(7)])
@@ -32,40 +44,52 @@ impl SVO {
     }
 
     // If the SVO is a Voxel, split it into octants. If it's already octants, panic.
-    fn subdivide_voxel(&mut self) {
+    fn subdivide_voxel<D>(&mut self, deregister_voxel: &D) where D : Fn(u32) {
         match *self {
-            SVO::Voxel(block_type) =>
-                *self = SVO::new_octants([block_type, block_type, block_type, block_type,
-                                          block_type, block_type, block_type, block_type]),
+            SVO::Voxel{ ref external_id, .. } => {
+                for voxel_id in external_id.get() {
+                    deregister_voxel(voxel_id)
+                };
+            },
+            _ => panic!("subdivide_voxel called on a non-voxel!")
+        }
+
+
+        match *self {
+            SVO::Voxel { voxel_type, .. } => {
+                *self = SVO::new_octants([voxel_type, voxel_type, voxel_type, voxel_type,
+                                          voxel_type, voxel_type, voxel_type, voxel_type])
+            },
             _ => panic!("subdivide_voxel called on a non-voxel!")
         }
     } 
 
     // Follow an index, splitting voxels as necessary. The set the block at the target to `Voxel(new_block_type)`.
     // Then go back up the tree, recombining if we've transformed all the octants in a node to the same voxel.
-    pub fn set_block_and_recombine(&mut self, index: &[u8], new_block_type: i32) {
+    pub fn set_block_and_recombine<D>(&mut self, index: &[u8], new_block_type: i32, deregister_voxel: &D) 
+            where D : Fn(u32) {
         if let Some(block_type) = self.get_voxel_type() {
             if block_type == new_block_type {return;} // nothing to do
         }
 
         match index.split_first() {
             // Overwrite whatever's here with the new voxel.
-            None => *self = SVO::Voxel(new_block_type), 
+            None => *self = SVO::new_voxel(new_block_type), 
 
             // We need to go deeper
             Some((ix, rest)) => { 
                 // Voxels get split up
-                if self.get_voxel_type().is_some() { self.subdivide_voxel(); } 
+                if self.get_voxel_type().is_some() { self.subdivide_voxel(deregister_voxel); } 
 
                 {
                     let ref mut octants = self.get_mut_octants().unwrap();
                     // Insert into the sub_octant
-                    octants[*ix as usize].set_block_and_recombine(rest, new_block_type);
+                    octants[*ix as usize].set_block_and_recombine(rest, new_block_type, deregister_voxel);
                 }
 
                 // Then if we have 8 voxels of the same type, combine them.
                 if let Some(combined_block_type) = self.get_octants().and_then(SVO::combine_voxels) {
-                    *self = SVO::Voxel(combined_block_type);
+                    *self = SVO::new_voxel(combined_block_type);
                 }
             }
         }
@@ -74,7 +98,7 @@ impl SVO {
     // If the SVO is a Voxel, return its contents.
     pub fn get_voxel_type(&self) -> Option<i32> {
         match *self {
-            SVO::Voxel(voxel_type) => Some(voxel_type),
+            SVO::Voxel { voxel_type, .. } => Some(voxel_type),
             _ => None
         }
     }
@@ -119,8 +143,8 @@ impl SVO {
         if t_min > t_max {return None};
         let hit_position = ray_dir * t_min + ray_origin;
         match *self {
-            SVO::Voxel(0) => None,
-            SVO::Voxel(_) => Some(hit_position),
+            SVO::Voxel { voxel_type, .. } if voxel_type == 0 => None,
+            SVO::Voxel { .. } => Some(hit_position),
             SVO::Octants(ref octants) => {
                 // work out which voxels are hit in turn, and if they're solid or not
                 // TODO: rather than trying dumbly, we could instead calculate which child is hit. Compare speeds?
@@ -163,20 +187,26 @@ impl SVO {
         })
     }
 
-    pub fn on_voxels<F>(&self, on_voxel: &F) where F : Fn(Vec3<f32>, i32, i32) {
-        self.on_voxels_from(&on_voxel, zero(), 0);
+    // TODO: This is a hack. We're still redrawing the whole tree each frame.
+    //       We should instead keep track somehow of whether or not we've the contents of a node.
+    pub fn redraw<F>(&self, on_voxel: &F) where F : Fn(Vec3<f32>, i32, i32) -> u32 {
+        self.redraw_from(&on_voxel, zero(), 0);
     }
 
-    fn on_voxels_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
-        where F : Fn(Vec3<f32>, i32, i32) {
+    fn redraw_from<F>(&self, on_voxel: &F, origin: Vec3<f32>, depth: i32) 
+        where F : Fn(Vec3<f32>, i32, i32) -> u32 {
         match *self {
-            SVO::Voxel(voxel_type) => { 
-                on_voxel(origin, depth, voxel_type); 
+            SVO::Voxel { voxel_type, ref external_id } => { 
+                if external_id.get().is_none() {
+                    let new_id = on_voxel(origin, depth, voxel_type); 
+                    external_id.set(Some(new_id));
+                }
             }
+
             SVO::Octants(ref octants) => for (ix, octant) in octants.iter().enumerate() {
                 let next_depth = depth + 1;
                 let offset = above_axis(ix) / ((1 << next_depth) as f32);
-                octant.on_voxels_from(on_voxel, origin + offset, next_depth);
+                octant.redraw_from(on_voxel, origin + offset, next_depth);
             }   
         }
     }
@@ -217,7 +247,7 @@ impl<'a> Index<&'a [u8]> for SVO {
         match index.split_first() {
             None => self,
             Some((ix, rest)) => match *self {
-                SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
+                SVO::Voxel { .. } => panic!("Index {:?} is too long!", index),
                 SVO::Octants(ref octants) => octants[*ix as usize].index(rest)
             }                
         }
@@ -229,7 +259,7 @@ impl<'a> IndexMut<&'a [u8]> for SVO {
         match index.split_first() {
             None => self,
             Some((ix, rest)) => match *self {
-                SVO::Voxel(_) => panic!("Index {:?} is too long!", index),
+                SVO::Voxel { .. } => panic!("Index {:?} is too long!", index),
                 SVO::Octants(ref mut octants) => octants[*ix as usize].index_mut(rest)
             }
         }
