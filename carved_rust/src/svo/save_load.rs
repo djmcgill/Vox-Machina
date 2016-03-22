@@ -19,7 +19,10 @@ impl SVO {
 
     fn as_bytes_in(&self, vec: &mut Vec<u8>) {
         match *self {
-            SVO::Voxel { data, .. } => vec.append(&mut data.as_bytes()),
+            SVO::Voxel { data, .. } => {
+                vec.push(0u8); // Tag the bytes as a voxel
+                vec.append(&mut data.as_bytes())
+            },
             SVO::Octants (ref octants) => {
 
                 let octant_indices = octants.iter().map(|octant| {
@@ -27,9 +30,10 @@ impl SVO {
                     vec.len() as u64 - 1
                 });
 
+                // error: cannot borrow `*vec` as mutable because previous closure requires unique access [E0501]
+                //vec.push(1u8); // Tag the bytes as an octant
                 for octant_index in octant_indices {
-                    // error: cannot borrow `*vec` as mutable because previous closure requires unique access [E0501]
-                    // vec.write_u64::<LittleEndian>(octant_index).unwrap();
+                    //vec.write_u64::<LittleEndian>(octant_index).unwrap();
                 }
             }
         };
