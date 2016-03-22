@@ -27,7 +27,7 @@ impl SVO {
         if t_min > t_max {return None};
         let hit_position = ray_dir * t_min + ray_origin;
         match *self {
-            SVO::Voxel { voxel_type, .. } if voxel_type == 0 => None,
+            SVO::Voxel { data: VoxelData{ voxel_type, .. }, .. } if voxel_type == 0 => None,
             SVO::Voxel { .. } => Some(hit_position),
             SVO::Octants(ref octants) => {
                 // work out which voxels are hit in turn, and if they're solid or not

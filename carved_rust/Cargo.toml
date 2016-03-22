@@ -5,6 +5,7 @@ authors = ["Swooshed <dmcgill9071@gmail.com>"]
 
 [dependencies]
 nalgebra = "0.5.1"
+lazy_static = "0.1.*"
 
 [lib]
 name = "carved_rust"

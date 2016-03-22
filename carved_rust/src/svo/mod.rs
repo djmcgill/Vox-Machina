@@ -2,11 +2,23 @@ use nalgebra::Vec3;
 
 pub mod cast_ray;
 pub mod set_block;
+pub mod save_load;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub struct VoxelData {
+    pub voxel_type: i32
+}
+
+impl VoxelData {
+    pub fn new(voxel_type: i32) -> VoxelData {
+        VoxelData { voxel_type: voxel_type }
+    }
+}
+
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
+#[derive(Debug, PartialEq)]
 pub enum SVO {
-    Voxel { voxel_type: i32, external_id: u32 },
+    Voxel { data: VoxelData, external_id: u32 },
 
     // For a given point (x, y, z), the index of its octant is
     // ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
@@ -14,8 +26,8 @@ pub enum SVO {
 }
 
 impl SVO {
-    pub fn new_voxel(voxel_type: i32, external_id: u32) -> SVO {
-        SVO::Voxel { voxel_type: voxel_type, external_id: external_id }
+    pub fn new_voxel(voxel_data: VoxelData, external_id: u32) -> SVO {
+        SVO::Voxel { data: voxel_data, external_id: external_id }
     }
 
     pub fn new_octants<F>(make_octant: &F) -> SVO where F: Fn(u8) -> SVO {
@@ -27,9 +39,9 @@ impl SVO {
     }
 
     // If the SVO is a Voxel, return its contents.
-    pub fn get_voxel_type(&self) -> Option<i32> {
+    pub fn get_voxel_data(&self) -> Option<VoxelData> {
         match *self {
-            SVO::Voxel { voxel_type, .. } => Some(voxel_type),
+            SVO::Voxel { data, .. } => Some(data),
             _ => None
         }
     }
@@ -46,6 +58,25 @@ impl SVO {
         match *self {
             SVO::Octants(ref mut octants) => Some(octants),
             _ => None
+        }
+    }
+
+    pub fn for_voxels<F>(&self, f: &F) where F: Fn(VoxelData) {
+        match *self {
+            SVO::Voxel { data, ..} => f(data),
+            SVO::Octants(ref octants) => for octant in octants { octant.for_voxels(f); }
+        }
+    }
+
+    pub fn fold_voxels<A, F, G>(&self, f: &F, g: &G) -> A
+            where F: Fn([&A; 8]) -> A, G: Fn(VoxelData) -> A {
+        match *self {
+            SVO::Voxel { data, ..} => g(data),
+            SVO::Octants(ref octants) => {
+                let map: Vec<A> = octants.iter().map(|svo| svo.fold_voxels(f, g)).collect();
+                f([&map[0], &map[1], &map[2], &map[3], &map[4], &map[5], &map[6], &map[7]])
+           },
+
         }
     }
 }

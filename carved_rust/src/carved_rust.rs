@@ -12,13 +12,15 @@ pub extern "stdcall" fn svo_create<'a>
      deregister_voxel_extern: extern "stdcall" fn(u32)
     ) -> *mut ExternalSVO<'a> {
 
-    let register_voxel = &|vec, depth, voxel_type| register_voxel_extern(vec, depth, voxel_type);
+    let register_voxel = &|vec, depth, VoxelData { voxel_type }| register_voxel_extern(vec, depth, voxel_type);
     let deregister_voxel = &|external_id| deregister_voxel_extern(external_id);
-    let uid = register_voxel(zero(), 0, voxel_type);
+
+    let voxel_data = VoxelData::new(voxel_type);
+    let uid = register_voxel(zero(), 0, voxel_data);
     let external_svo = ExternalSVO {
         register_voxel: register_voxel,
         deregister_voxel: deregister_voxel,
-        svo: SVO::new_voxel(voxel_type, uid)
+        svo: SVO::new_voxel(voxel_data, uid)
     };
     unsafe { transmute(Box::new(external_svo)) }
 }
@@ -36,15 +38,16 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const ExternalSVO, ray_origin: Ve
 }
 
 #[no_mangle]
-pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_block_type: i32) {
+pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_voxel_type: i32) {
     let svo_ref: &mut ExternalSVO = unsafe { &mut *svo_ptr };
     let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
-    svo_ref.svo.set_block(&svo_ref.deregister_voxel, &svo_ref.register_voxel, index, new_block_type);
+    let voxel_data = VoxelData::new(new_voxel_type);
+    svo_ref.svo.set_block(&svo_ref.deregister_voxel, &svo_ref.register_voxel, index, voxel_data);
 }
 
 // UTILS
 pub struct ExternalSVO<'a> {
-    pub register_voxel: &'a Fn(Vec3<f32>, i32, i32) -> u32,
+    pub register_voxel: &'a Fn(Vec3<f32>, i32, VoxelData) -> u32,
     pub deregister_voxel: &'a Fn(u32),
     pub svo: SVO
 }

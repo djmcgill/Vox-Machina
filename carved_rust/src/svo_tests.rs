@@ -3,7 +3,7 @@ use nalgebra::{ApproxEq, Vec3, zero};
 use std::cell::RefCell;
 use svo::*;
 
-fn register(_: Vec3<f32>, _: i32, _: i32) -> u32 { 0 }
+fn register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
 fn deregister(_: u32) {}
 
 // === SVO tests ====
@@ -23,8 +23,8 @@ fn on_blocks() {
 
 #[test]
 fn minimal_subdivide() {
-    let mut svo = SVO::new_voxel(1, 0);
-    svo.set_block(&deregister, &register, &[1], 0);
+    let mut svo = SVO::new_voxel(VoxelData::new(1), 0);
+    svo.set_block(&deregister, &register, &[1], VoxelData::new(0));
 
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
@@ -41,7 +41,7 @@ fn minimal_subdivide() {
 fn setting_blocks() {
     let mut svo = SVO::floor();
 
-    svo.set_block(&deregister, &register, &[1, 3], 2);
+    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(2));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
@@ -59,7 +59,7 @@ fn setting_blocks() {
         (0. , 0.5, 0.5, 1, 0),
         (0.5, 0.5, 0.5, 1, 0)]);
 
-    svo.set_block(&deregister, &register, &[1, 3], 1);
+    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(1));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
         (0.5, 0. , 0. , 1, 1),
@@ -126,7 +126,8 @@ impl SVO {
 
     fn collect_svo(&self, results_vec: &RefCell<Vec<(f32, f32, f32, i32, i32)>>, origin: Vec3<f32>, depth: i32) {
         match *self {
-            SVO::Voxel { voxel_type, .. } => results_vec.borrow_mut().push((origin.x, origin.y, origin.z, depth, voxel_type)),
+            SVO::Voxel { data: VoxelData { voxel_type, .. }, .. } =>
+                results_vec.borrow_mut().push((origin.x, origin.y, origin.z, depth, voxel_type)),
             SVO::Octants (ref octants) => {
                 for ix in 0..8 {
                     let new_origin = origin + offset(ix, depth);
@@ -138,11 +139,11 @@ impl SVO {
     }
 
     fn floor() -> SVO {
-        let mut svo = SVO::new_voxel(1, 0);
-        svo.set_block(&deregister, &register, &[2], 0);
-        svo.set_block(&deregister, &register, &[3], 0);
-        svo.set_block(&deregister, &register, &[6], 0);
-        svo.set_block(&deregister, &register, &[7], 0);
+        let mut svo = SVO::new_voxel( VoxelData::new(1), 0);
+        svo.set_block(&deregister, &register, &[2], VoxelData::new(0));
+        svo.set_block(&deregister, &register, &[3], VoxelData::new(0));
+        svo.set_block(&deregister, &register, &[6], VoxelData::new(0));
+        svo.set_block(&deregister, &register, &[7], VoxelData::new(0));
         svo
     }
 
