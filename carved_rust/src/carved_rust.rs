@@ -6,11 +6,11 @@ use nalgebra::{Vec3, zero};
 
 // FFI INTERFACE
 #[no_mangle]
-pub extern "stdcall" fn svo_create<'a>
+pub extern "stdcall" fn svo_create
     (voxel_type: i32,
      register_voxel_extern: extern "stdcall" fn(Vec3<f32>, i32, i32) -> u32,
      deregister_voxel_extern: extern "stdcall" fn(u32)
-    ) -> *mut ExternalSVO<'a> {
+    ) -> *mut ExternalSVO<'static> {
 
     let register_voxel = &|vec, depth, VoxelData { voxel_type }| register_voxel_extern(vec, depth, voxel_type);
     let deregister_voxel = &|external_id| deregister_voxel_extern(external_id);

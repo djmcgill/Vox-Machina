@@ -33,7 +33,7 @@ impl SVO {
 
                 {
                     // Insert into the sub_octant
-                    let ref mut octants = self.get_mut_octants().unwrap();
+                    let octants = self.get_mut_octants().unwrap();
                     let new_origin = origin + offset(ix, depth);
                     octants[ix as usize].set_voxel_from(deregister_voxel, register_voxel,
                                                         rest, new_voxel_data, new_origin, depth+1);

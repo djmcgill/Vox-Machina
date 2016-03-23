@@ -7,7 +7,7 @@ use svo::*;
 impl VoxelData {
     fn as_bytes(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.write_i32::<LittleEndian>(self.voxel_type);
+        vec.write_i32::<LittleEndian>(self.voxel_type).unwrap();
         vec
     }
 
@@ -47,7 +47,7 @@ impl SVO {
     pub fn from_bytes(mut bytes: &[u8]) -> SVO {
         let mut stack: Vec<SVO> = vec![];
         let mut b = [0];
-        bytes.read(&mut b);
+        bytes.read(&mut b).unwrap();
         match b[0] {
             0u8 => stack.push(SVO::new_voxel(VoxelData::read(bytes), 0)),
             1u8 if stack.len() < 8 => panic!("Cannot interpret bytes as SVO; found an Octant when there weren't enough children."),
@@ -72,8 +72,8 @@ impl SVO {
         if stack.len() != 1 {
             panic!(format!("Finished reading the bytes and found {} root SVOs when there should only be one.", stack.len()))
         };
-        let svo = stack.pop().unwrap();
-        svo // TODO: register_all the SVO
+        // TODO: register_all the SVO
+        stack.pop().unwrap()
     }
 }
 
