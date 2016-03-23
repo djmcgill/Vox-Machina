@@ -1,6 +1,8 @@
+//extern crate test;
+
 use carved_rust;
 use nalgebra::{ApproxEq, Vec3, zero};
-use std::cell::RefCell;
+use std::io::Cursor;
 use svo::*;
 
 fn register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
@@ -91,6 +93,59 @@ fn ray_casting() {
     assert!(no_hit1.is_none());
 }
 
+#[test]
+fn save_load() {
+    let mut svo = SVO::floor();
+
+    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(2));
+    svo.assert_contains(vec![
+        (0. , 0. , 0. , 1, 1),
+            (0.5 , 0.  , 0.  , 2, 1),
+            (0.75, 0.  , 0.  , 2, 1),
+            (0.5 , 0.25, 0.  , 2, 1),
+            (0.75, 0.25, 0.  , 2, 2),
+            (0.5 , 0.  , 0.25, 2, 1),
+            (0.75, 0.  , 0.25, 2, 1),
+            (0.5 , 0.25, 0.25, 2, 1),
+            (0.75, 0.25, 0.25, 2, 1),
+        (0. , 0.5, 0. , 1, 0),
+        (0.5, 0.5, 0. , 1, 0),
+        (0. , 0. , 0.5, 1, 1),
+        (0.5, 0. , 0.5, 1, 1),
+        (0. , 0.5, 0.5, 1, 0),
+        (0.5, 0.5, 0.5, 1, 0)]);
+
+    println!("==== SAVING ====");
+    let mut bytes: Vec<u8> = vec![];
+    svo.write_to(&mut bytes).unwrap();
+    println!("\n\n");
+
+    // Just to make sure that we don't reuse the same memory
+    let dummy_vec = vec![0u8; 500];
+    println!("{:?}", dummy_vec[2]);
+
+    println!("==== LOADING ====");
+    let new_svo = SVO::read_from(&mut Cursor::new(bytes)).unwrap();
+    new_svo.assert_contains(vec![
+        (0. , 0. , 0. , 1, 1),
+            (0.5 , 0.  , 0.  , 2, 1),
+            (0.75, 0.  , 0.  , 2, 1),
+            (0.5 , 0.25, 0.  , 2, 1),
+            (0.75, 0.25, 0.  , 2, 2),
+            (0.5 , 0.  , 0.25, 2, 1),
+            (0.75, 0.  , 0.25, 2, 1),
+            (0.5 , 0.25, 0.25, 2, 1),
+            (0.75, 0.25, 0.25, 2, 1),
+        (0. , 0.5, 0. , 1, 0),
+        (0.5, 0.5, 0. , 1, 0),
+        (0. , 0. , 0.5, 1, 1),
+        (0.5, 0. , 0.5, 1, 1),
+        (0. , 0.5, 0.5, 1, 0),
+        (0.5, 0.5, 0.5, 1, 0)]);
+
+
+}
+
 // #[test]
 // fn test_ffi() {
 //  let ptr = carved_rust::svo_create(1);
@@ -106,9 +161,9 @@ fn ray_casting() {
 
 impl SVO {
     fn assert_contains(&self, expected: Vec<(f32, f32, f32, i32, i32)>) {
-        let results_vec: RefCell<Vec<(f32, f32, f32, i32, i32)>> = RefCell::new(Vec::new());
-        self.collect_svo(&results_vec, zero(), 0);
-        let results = results_vec.into_inner();
+        let mut results_vec: Vec<(f32, f32, f32, i32, i32)> = Vec::new();
+        self.collect_svo(&mut results_vec, zero(), 0);
+        let results = results_vec;
 
         assert_eq!(results.len(), expected.len());
 
@@ -124,10 +179,10 @@ impl SVO {
         }
     }
 
-    fn collect_svo(&self, results_vec: &RefCell<Vec<(f32, f32, f32, i32, i32)>>, origin: Vec3<f32>, depth: i32) {
+    fn collect_svo(&self, results_vec: &mut Vec<(f32, f32, f32, i32, i32)>, origin: Vec3<f32>, depth: i32) {
         match *self {
             SVO::Voxel { data: VoxelData { voxel_type, .. }, .. } =>
-                results_vec.borrow_mut().push((origin.x, origin.y, origin.z, depth, voxel_type)),
+                results_vec.push((origin.x, origin.y, origin.z, depth, voxel_type)),
             SVO::Octants (ref octants) => {
                 for ix in 0..8 {
                     let new_origin = origin + offset(ix, depth);
