@@ -42,10 +42,10 @@ impl SVO {
         let mut stack: Vec<SVO> = vec![];
 
         let mut b = [0];
-        while reader.read(&mut b).unwrap_or(0) > 0 {
+        while try!{ reader.read(&mut b) } > 0 {
             match b[0] {
                 VOXEL_TAG => {
-                    let data = VoxelData::read_from(reader).unwrap();
+                    let data = try!{ VoxelData::read_from(reader) };
                     stack.push(SVO::new_voxel(data, 0));
                 },
                 OCTANT_TAG if stack.len() < 8 => panic!("Cannot interpret bytes as SVO; found an Octant when there weren't enough children."),
@@ -65,12 +65,12 @@ impl SVO {
                         octant4, octant5, octant6, octant7
                     ]));
                 }
-                other => panic!(format!("Invalid SVO type specifier '{}' found", other))
+                other => panic!("Invalid SVO type specifier '{}' found", other)
             }
         }
 
         if stack.len() != 1 {
-            panic!(format!("Finished reading the bytes and found {} root SVOs when there should only be one.", stack.len()))
+            panic!("Finished reading the bytes and found {} root SVOs when there should only be one.", stack.len())
         };
         // TODO: register_all the SVO
         Ok(stack.pop().unwrap())
