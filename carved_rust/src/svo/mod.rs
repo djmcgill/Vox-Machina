@@ -30,7 +30,7 @@ impl SVO {
         SVO::Voxel { data: voxel_data, external_id: external_id }
     }
 
-    pub fn new_octants<F>(make_octant: &F) -> SVO where F: Fn(u8) -> SVO {
+    pub fn new_octants<F: Fn(u8) -> SVO>(make_octant: &F) -> SVO {
         SVO::Octants([
             Box::new(make_octant(0)), Box::new(make_octant(1)),
             Box::new(make_octant(2)), Box::new(make_octant(3)),
@@ -58,25 +58,6 @@ impl SVO {
         match *self {
             SVO::Octants(ref mut octants) => Some(octants),
             _ => None
-        }
-    }
-
-    pub fn for_voxels<F>(&self, f: &F) where F: Fn(VoxelData) {
-        match *self {
-            SVO::Voxel { data, ..} => f(data),
-            SVO::Octants(ref octants) => for octant in octants { octant.for_voxels(f); }
-        }
-    }
-
-    pub fn fold_voxels<A, F, G>(&self, f: &F, g: &G) -> A
-            where F: Fn([&A; 8]) -> A, G: Fn(VoxelData) -> A {
-        match *self {
-            SVO::Voxel { data, ..} => g(data),
-            SVO::Octants(ref octants) => {
-                let map: Vec<A> = octants.iter().map(|svo| svo.fold_voxels(f, g)).collect();
-                f([&map[0], &map[1], &map[2], &map[3], &map[4], &map[5], &map[6], &map[7]])
-           },
-
         }
     }
 }

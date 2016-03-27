@@ -15,14 +15,8 @@ public class SVOController : MonoBehaviour
     void Start()
 	{
         print("Starting");
-		svo = new SVO();
 
-		svo.SetBlock(new byte[] { 2 }, 0);
-		svo.SetBlock(new byte[] { 3 }, 0);
-		svo.SetBlock(new byte[] { 6 }, 0);
-		svo.SetBlock(new byte[] { 7 }, 0);
-
-		SVO.OnBlocksCallback callback = (Vector3 vec, int depth, int voxelType) => {
+		SVO.UnityRegisterCallback registerCallback = (Vector3 vec, int depth, int voxelType) => {
 			if (voxelType != 0)
 			{
 				print(String.Format("Vec: ( {0}, {1}, {2} ) depth: {3} type: {4}", vec.x, vec.y, vec.z, depth, voxelType));
@@ -30,9 +24,20 @@ public class SVOController : MonoBehaviour
 				float scale = (float) Math.Pow(2, -depth);
 				obj.localScale = new Vector3(scale, scale, scale);
 			}
+			return 0;
 		};
 
-		svo.OnBlocks (callback);
+		SVO.UnityDeregisterCallback deregisterCallback = (uint id) => {};
+
+		svo = new SVO(1, registerCallback, deregisterCallback);
+
+		print ("Registered");
+
+		svo.SetBlock(new byte[] { 2 }, 0);
+		svo.SetBlock(new byte[] { 3 }, 0);
+		svo.SetBlock(new byte[] { 6 }, 0);
+		svo.SetBlock(new byte[] { 7 }, 0);
+
 
         print("finished startup");
     }

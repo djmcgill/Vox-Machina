@@ -14,6 +14,9 @@ impl SVO {
     fn set_voxel_from<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
     	                    index: &[u8], new_voxel_data: VoxelData, origin: Vec3<f32>, depth: i32)
             where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
+
+        println!("calling set_voxel_from with index {:?}", index);
+
         if let Some(voxel_data) = self.get_voxel_data() {
             if voxel_data == new_voxel_data {return;} // nothing to do
         }
@@ -22,14 +25,19 @@ impl SVO {
             // Overwrite whatever's here with the new voxel.
             None => {
                 self.deregister_all(deregister_voxel);
+                println!("about to call register_voxel");
                 let uid = register_voxel(origin, depth, new_voxel_data);
+                println!("called register_voxel");
                 *self = SVO::new_voxel(new_voxel_data, uid);
             },
 
             // We need to go deeper.
             Some((&ix, rest)) => {
                 // Voxels get split up
-                if self.get_voxel_data().is_some() { self.subdivide_voxel(deregister_voxel, register_voxel, origin, depth); }
+                if self.get_voxel_data().is_some() {
+                    println!("Splitting a voxel");
+                    self.subdivide_voxel(deregister_voxel, register_voxel, origin, depth); 
+                }
 
                 {
                     // Insert into the sub_octant
@@ -52,9 +60,13 @@ impl SVO {
             where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
         *self = match *self {
             SVO::Voxel { data, external_id } => {
+                println!("about to deregister {}", external_id);
                 deregister_voxel(external_id);
+                println!("deregistered");
                 SVO::new_octants(&|ix| {
+                    println!("about to call register_voxel2");
                     let uid = register_voxel(origin + offset(ix, depth), depth+1, data);
+                    println!("called register_voxel2");
                     SVO::new_voxel(data, uid)
                 })
             },

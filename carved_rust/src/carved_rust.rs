@@ -12,8 +12,23 @@ pub extern "stdcall" fn svo_create
      deregister_voxel_extern: extern "stdcall" fn(u32)
     ) -> *mut ExternalSVO<'static> {
 
-    let register_voxel = &|vec, depth, VoxelData { voxel_type }| register_voxel_extern(vec, depth, voxel_type);
-    let deregister_voxel = &|external_id| deregister_voxel_extern(external_id);
+    let register_voxel = &|vec, depth, VoxelData { voxel_type }| {
+        println!("rust callback register_voxel {:?} {} {}", vec, depth, voxel_type);
+        let uid = register_voxel_extern(vec, depth, voxel_type);
+        println!("rust callback register_voxel done");
+        uid
+    };
+
+    println!("test deregister start");
+    deregister_voxel_extern(0);
+    println!("test deregister end");
+
+    let deregister_voxel = &|external_id| {
+        println!("rust callback deregister_voxel {}", external_id);
+        deregister_voxel_extern(external_id);
+        println!("rust callback deregister_voxel done");
+    };
+
 
     let voxel_data = VoxelData::new(voxel_type);
     let uid = register_voxel(zero(), 0, voxel_data);
@@ -39,13 +54,22 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const ExternalSVO, ray_origin: Ve
 
 #[no_mangle]
 pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_voxel_type: i32) {
-    let svo_ref: &mut ExternalSVO = unsafe { &mut *svo_ptr };
+    let mut svo_ref: &mut ExternalSVO = unsafe { &mut *svo_ptr };
     let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
+    println!("about to deregister in other function");
+    (svo_ref.deregister_voxel)(0);
+    println!("deregistered in other function");
     let voxel_data = VoxelData::new(new_voxel_type);
     svo_ref.svo.set_block(&svo_ref.deregister_voxel, &svo_ref.register_voxel, index, voxel_data);
 }
 
 // UTILS
+#[repr(C)]
+pub struct Callbacks {
+    register_voxel: extern "stdcall" fn(Vec3<f32>, i32, i32) -> u32,
+    deregister_voxel_ptr: extern "stdcall" fn(u32)
+}
+
 pub struct ExternalSVO<'a> {
     pub register_voxel: &'a Fn(Vec3<f32>, i32, VoxelData) -> u32,
     pub deregister_voxel: &'a Fn(u32),

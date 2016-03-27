@@ -12,7 +12,29 @@ public class SVO : IDisposable
 	// Public interface
 	public SVO()
 	{
-		svoPtr = svo_create(DEFAULT_BLOCK_TYPE);
+		rust_register_callback registerVoxel = (Vec3 vec, int depth, int voxelType) => {
+			return 0;
+		};
+
+		rust_deregister_callback deregisterVoxel = (uint id) => {
+			Console.WriteLine(String.Format("from unity deregistering {0}", id));
+		};
+
+		svoPtr = svo_create(DEFAULT_BLOCK_TYPE, registerVoxel, deregisterVoxel);
+	}
+
+	public SVO(int defaultVoxelType, UnityRegisterCallback registerVoxel, UnityDeregisterCallback deregisterVoxel)
+	{
+		rust_register_callback rustRegisterCallback = (Vec3 vec, int depth, int voxelType) => {
+			return registerVoxel (RustToUnity (vec), depth, defaultVoxelType);
+		};
+
+		rust_deregister_callback rustDeregisterCallback = (uint id) => {
+			Console.WriteLine(String.Format("from unity deregistering {0}", id));
+			deregisterVoxel (id);
+		};
+			
+		svoPtr = svo_create(defaultVoxelType, rustRegisterCallback, rustDeregisterCallback);
 	}
 
 	public void Dispose ()
@@ -34,30 +56,11 @@ public class SVO : IDisposable
 		Dispose(false);
 	}
 
-	public delegate void OnBlocksCallback(Vector3 vec, int depth, int voxelType);
-
-	public void OnBlocks (OnBlocksCallback onBlocks)
-	{
-		RustOnBlocksCallback rustOnBlocks = (Vec3 vec, int depth, int voxelType) => {
-			var vector = new Vector3 (vec.x, vec.y, vec.z);
-			onBlocks (vector, depth, voxelType);
-		};
-		svo_on_voxels(svoPtr, rustOnBlocks);
-	}
-
 	/// Will return null if the ray misses.
 	public Nullable<Vector3> CastRay (Vector3 rayOrigin, Vector3 rayDirection)
 	{
-		Vec3 rustOrigin;
-		rustOrigin.x = rayOrigin.x;
-		rustOrigin.y = rayOrigin.y;
-		rustOrigin.z = rayOrigin.z;
-
-		Vec3 rustDir;
-		rustDir.x = rayDirection.x;
-		rustDir.y = rayDirection.y;
-		rustDir.z = rayDirection.z;
-			
+		var rustOrigin = UnityToRust (rayOrigin);
+		var rustDir = UnityToRust (rayDirection);
 		var maybeHit = svo_cast_ray (svoPtr, rustOrigin, rustDir);
 
 		if (maybeHit.isSome != 0)
@@ -76,18 +79,17 @@ public class SVO : IDisposable
 		svo_set_block (svoPtr, index, (UIntPtr)index.Length, newBlockType);
 	}
 
+	public delegate uint UnityRegisterCallback(Vector3 vec, int depth, int voxelType);
+	private delegate uint rust_register_callback(Vec3 vec, int depth, int voxelType);
+	public delegate void UnityDeregisterCallback(uint id);
+	private delegate void rust_deregister_callback(uint id);
 
 	// FFI interface
 	[DllImport("libcarved_rust")]
-	private static extern IntPtr svo_create (int x);
+	private static extern IntPtr svo_create (int voxelType, rust_register_callback register_voxel, rust_deregister_callback deregister_voxel);
 
 	[DllImport("libcarved_rust")]
 	private static extern void svo_destroy (IntPtr svo);
-
-	private delegate void RustOnBlocksCallback (Vec3 vec, int depth, int voxel_type);
-
-	[DllImport("libcarved_rust")]
-	private static extern void svo_on_voxels (IntPtr svo, RustOnBlocksCallback onBlocks);
 
 	[StructLayout(LayoutKind.Sequential)]
 	private struct Vec3
@@ -111,5 +113,19 @@ public class SVO : IDisposable
 
 	[DllImport("libcarved_rust")]
 	private static extern void svo_set_block (IntPtr svo, Byte[] indexPtr, UIntPtr indexLen, int newBlockType);
+
+	private Vector3 RustToUnity(Vec3 vec)
+	{
+		return new Vector3 (vec.x, vec.y, vec.z);
+	}
+
+	private Vec3 UnityToRust(Vector3 vec)
+	{
+		Vec3 ret;
+		ret.x = vec.x;
+		ret.y = vec.y;
+		ret.z = vec.z;	
+		return ret;
+	}
 }
 

@@ -43,13 +43,13 @@ fn minimal_subdivide() {
 fn setting_blocks() {
     let mut svo = SVO::floor();
 
-    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(2));
+    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(3));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
             (0.75, 0.  , 0.  , 2, 1),
             (0.5 , 0.25, 0.  , 2, 1),
-            (0.75, 0.25, 0.  , 2, 2),
+            (0.75, 0.25, 0.  , 2, 3),
             (0.5 , 0.  , 0.25, 2, 1),
             (0.75, 0.  , 0.25, 2, 1),
             (0.5 , 0.25, 0.25, 2, 1),
@@ -95,6 +95,7 @@ fn ray_casting() {
 
 #[test]
 fn save_load() {
+    use svo::save_load::{ReadSVO, WriteSVO}; // Why isn't this reexported with 'pub mod save_load;'?
     let mut svo = SVO::floor();
 
     svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(2));
@@ -117,7 +118,7 @@ fn save_load() {
 
     println!("==== SAVING ====");
     let mut bytes: Vec<u8> = vec![];
-    svo.write_to(&mut bytes).unwrap();
+    bytes.write_svo(&svo).unwrap();
     println!("\n\n");
 
     // Just to make sure that we don't reuse the same memory
@@ -125,7 +126,8 @@ fn save_load() {
     println!("{:?}", dummy_vec[2]);
 
     println!("==== LOADING ====");
-    let new_svo = SVO::read_from(&mut Cursor::new(bytes)).unwrap();
+    let reader = &mut Cursor::new(bytes);
+    let new_svo = reader.read_svo().unwrap();
     new_svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
@@ -145,19 +147,6 @@ fn save_load() {
 
 
 }
-
-// #[test]
-// fn test_ffi() {
-//  let ptr = carved_rust::svo_create(1);
-//  let block_type_1 = carved_rust::svo_get_voxel_type(ptr);
-//  assert!(block_type_1 == 1);
-//  carved_rust::svo_set_voxel_type(ptr, 2);
-//  let block_type_2 = carved_rust::svo_get_voxel_type(ptr);
-//  assert!(block_type_2 == 2);
-//  carved_rust::svo_destroy(ptr);
-// }
-
-
 
 impl SVO {
     fn assert_contains(&self, expected: Vec<(f32, f32, f32, i32, i32)>) {
@@ -204,10 +193,22 @@ impl SVO {
 
 }
 
-// === FFI tests ===
+
+//=== FFI tests === these are completely broken - calling the external register voxel function
+//will stack overflow I think??
+
+// #[no_mangle]
+// extern "stdcall" fn ext_register(v: Vec3<f32>, d: i32, t: i32) -> u32 { return 1u32; }
+// #[no_mangle]
+// extern "stdcall" fn ext_deregister(_: u32) {}
+
 // #[test]
 // fn ff_integration() {
-//     let svo_ptr = carved_rust::svo_create(1);
+
+//     let callbacks = carved_rust::Callbacks {register_voxel: ext_register, deregister_voxel: ext_deregister};
+//     let callbacks_ptr = &callbacks as *const _;
+
+//     let svo_ptr = carved_rust::svo_create(1, callbacks_ptr);
 
 //     let index = &[1u8];
 //     carved_rust::svo_set_block(svo_ptr, index.as_ptr(), index.len(), 2);
@@ -215,16 +216,17 @@ impl SVO {
 //     // I can't actually (be bothered to) produce a extern "stdcall" fn(Vec3<f32>, i32, i32)
 //     // so cheat and replicate the code from carved_rust::on_voxels. Luckily (by design) it's a shallow wrapper.
 //     {
-//         let svo_ref: &SVO = unsafe { &*svo_ptr };
-//         svo_ref.assert_contains(vec![
-//             (0. , 0. , 0. , 1, 1),
-//             (0.5, 0. , 0. , 1, 2),
-//             (0. , 0.5, 0. , 1, 1),
-//             (0.5, 0.5, 0. , 1, 1),
-//             (0. , 0. , 0.5, 1, 1),
-//             (0.5, 0. , 0.5, 1, 1),
-//             (0. , 0.5, 0.5, 1, 1),
-//             (0.5, 0.5, 0.5, 1, 1)]);
+//         //let esvo_ref: &carvedSVO = unsafe { &*svo_ptr };
+//         //let ref svo_ref = esvo_ref.svo;
+//         // svo_ref.assert_contains(vec![
+//         //     (0. , 0. , 0. , 1, 1),
+//         //     (0.5, 0. , 0. , 1, 2),
+//         //     (0. , 0.5, 0. , 1, 1),
+//         //     (0.5, 0.5, 0. , 1, 1),
+//         //     (0. , 0. , 0.5, 1, 1),
+//         //     (0.5, 0. , 0.5, 1, 1),
+//         //     (0. , 0.5, 0.5, 1, 1),
+//         //     (0.5, 0.5, 0.5, 1, 1)]);
 //     }
 
 //     let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(0.52, 2., 0.52), Vec3::new(0., -1., 0.));
@@ -235,5 +237,5 @@ impl SVO {
 //     assert!(maybe_hit2.is_some == 0);
 
 //     carved_rust::svo_destroy(svo_ptr);
+//     panic!();
 // }
-
