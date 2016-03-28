@@ -1,19 +1,23 @@
 use nalgebra::{Vec3, zero};
 use svo::*;
 
+pub trait Register: Fn(Vec3<f32>, i32, VoxelData) -> u32 {}
+impl<R: Fn(Vec3<f32>, i32, VoxelData) -> u32> Register for R {}
+
+pub trait Deregister: Fn(u32) {}
+impl<D: Fn(u32)> Deregister for D {}
+
 impl SVO {
     // Follow an index, splitting voxels as necessary. The set the block at the target to a Voxel with the specified data.
     // Then go back up the tree, recombining if we've transformed all the octants in a node to the same voxel.
-    pub fn set_block<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
-                           index: &[u8], new_voxel_data: VoxelData)
-        	where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
-        self.set_voxel_from(deregister_voxel, register_voxel, index, new_voxel_data, zero(), 0);
+    pub fn set_block<R: Register, D: Deregister>(&mut self, register_voxel: R, deregister_voxel: D,
+                           index: &[u8], new_voxel_data: VoxelData) {
+        self.set_voxel_from(&register_voxel, &deregister_voxel, index, new_voxel_data, zero(), 0);
     }
 
     // TODO: could this recursion pattern be generalised?
-    fn set_voxel_from<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
-    	                    index: &[u8], new_voxel_data: VoxelData, origin: Vec3<f32>, depth: i32)
-            where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
+    fn set_voxel_from<R: Register, D: Deregister>(&mut self, register_voxel: &R, deregister_voxel: &D,
+    	                    index: &[u8], new_voxel_data: VoxelData, origin: Vec3<f32>, depth: i32) {
 
         println!("calling set_voxel_from with index {:?}", index);
 
@@ -25,9 +29,7 @@ impl SVO {
             // Overwrite whatever's here with the new voxel.
             None => {
                 self.deregister_all(deregister_voxel);
-                println!("about to call register_voxel");
                 let uid = register_voxel(origin, depth, new_voxel_data);
-                println!("called register_voxel");
                 *self = SVO::new_voxel(new_voxel_data, uid);
             },
 
@@ -36,37 +38,32 @@ impl SVO {
                 // Voxels get split up
                 if self.get_voxel_data().is_some() {
                     println!("Splitting a voxel");
-                    self.subdivide_voxel(deregister_voxel, register_voxel, origin, depth); 
+                    self.subdivide_voxel(register_voxel, deregister_voxel, origin, depth);
                 }
 
                 {
                     // Insert into the sub_octant
                     let octants = self.get_mut_octants().unwrap();
                     let new_origin = origin + offset(ix, depth);
-                    octants[ix as usize].set_voxel_from(deregister_voxel, register_voxel,
+                    octants[ix as usize].set_voxel_from(register_voxel, deregister_voxel,
                                                         rest, new_voxel_data, new_origin, depth+1);
                 }
 
                 // Then if we have 8 voxels of the same type, combine them.
                 if let Some(combined_voxel_data) = self.get_octants().and_then(combine_voxels) {
-                    self.recombine_octants(deregister_voxel, register_voxel, origin, depth, combined_voxel_data);
+                    self.recombine_octants(register_voxel, deregister_voxel, origin, depth, combined_voxel_data);
                 }
             }
         }
     }
 
-    fn subdivide_voxel<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
-                             origin: Vec3<f32>, depth: i32)
-            where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
+    fn subdivide_voxel<R: Register, D: Deregister>(&mut self, register_voxel: &R, deregister_voxel: &D,
+                             origin: Vec3<f32>, depth: i32) {
         *self = match *self {
             SVO::Voxel { data, external_id } => {
-                println!("about to deregister {}", external_id);
                 deregister_voxel(external_id);
-                println!("deregistered");
                 SVO::new_octants(&|ix| {
-                    println!("about to call register_voxel2");
                     let uid = register_voxel(origin + offset(ix, depth), depth+1, data);
-                    println!("called register_voxel2");
                     SVO::new_voxel(data, uid)
                 })
             },
@@ -74,9 +71,8 @@ impl SVO {
         };
     }
 
-    fn recombine_octants<D, R>(&mut self, deregister_voxel: &D, register_voxel: &R,
-                               origin: Vec3<f32>, depth: i32, voxel_data: VoxelData)
-            where D : Fn(u32), R : Fn(Vec3<f32>, i32, VoxelData) -> u32 {
+    fn recombine_octants<R: Register, D: Deregister>(&mut self, register_voxel: &R, deregister_voxel: &D,
+                               origin: Vec3<f32>, depth: i32, voxel_data: VoxelData) {
         *self = match *self {
             SVO::Octants(ref mut octants) => {
                 for octant in octants { octant.deregister_all(deregister_voxel); }
@@ -87,7 +83,7 @@ impl SVO {
         }
     }
 
-    fn deregister_all<D>(&mut self, deregister_voxel: &D) where D: Fn(u32) {
+    fn deregister_all<D: Deregister>(&mut self, deregister_voxel: &D) {
         match *self {
             SVO::Voxel { external_id, .. } => deregister_voxel(external_id),
             SVO::Octants (ref mut octants) =>

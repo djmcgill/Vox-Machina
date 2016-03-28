@@ -26,7 +26,7 @@ fn on_blocks() {
 #[test]
 fn minimal_subdivide() {
     let mut svo = SVO::new_voxel(VoxelData::new(1), 0);
-    svo.set_block(&deregister, &register, &[1], VoxelData::new(0));
+    svo.set_block(register, deregister, &[1], VoxelData::new(0));
 
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
@@ -43,7 +43,7 @@ fn minimal_subdivide() {
 fn setting_blocks() {
     let mut svo = SVO::floor();
 
-    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(3));
+    svo.set_block(register, deregister, &[1, 3], VoxelData::new(3));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
@@ -61,7 +61,7 @@ fn setting_blocks() {
         (0. , 0.5, 0.5, 1, 0),
         (0.5, 0.5, 0.5, 1, 0)]);
 
-    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(1));
+    svo.set_block(register, deregister, &[1, 3], VoxelData::new(1));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
         (0.5, 0. , 0. , 1, 1),
@@ -98,7 +98,7 @@ fn save_load() {
     use svo::save_load::{ReadSVO, WriteSVO}; // Why isn't this reexported with 'pub mod save_load;'?
     let mut svo = SVO::floor();
 
-    svo.set_block(&deregister, &register, &[1, 3], VoxelData::new(2));
+    svo.set_block(register, deregister, &[1, 3], VoxelData::new(2));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
@@ -184,58 +184,46 @@ impl SVO {
 
     fn floor() -> SVO {
         let mut svo = SVO::new_voxel( VoxelData::new(1), 0);
-        svo.set_block(&deregister, &register, &[2], VoxelData::new(0));
-        svo.set_block(&deregister, &register, &[3], VoxelData::new(0));
-        svo.set_block(&deregister, &register, &[6], VoxelData::new(0));
-        svo.set_block(&deregister, &register, &[7], VoxelData::new(0));
+        svo.set_block(register, deregister, &[2], VoxelData::new(0));
+        svo.set_block(register, deregister, &[3], VoxelData::new(0));
+        svo.set_block(register, deregister, &[6], VoxelData::new(0));
+        svo.set_block(register, deregister, &[7], VoxelData::new(0));
         svo
     }
 
 }
 
 
-//=== FFI tests === these are completely broken - calling the external register voxel function
-//will stack overflow I think??
+//=== FFI tests ===
+extern "stdcall" fn ext_register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
+extern "stdcall" fn ext_deregister(_: u32) {}
 
-// #[no_mangle]
-// extern "stdcall" fn ext_register(v: Vec3<f32>, d: i32, t: i32) -> u32 { return 1u32; }
-// #[no_mangle]
-// extern "stdcall" fn ext_deregister(_: u32) {}
+#[test]
+fn ffi_integration() {
+    let svo_ptr = carved_rust::svo_create(1, ext_register, ext_deregister);
 
-// #[test]
-// fn ff_integration() {
+    let index = &[1u8];
+    carved_rust::svo_set_block(svo_ptr, index.as_ptr(), index.len(), 2);
 
-//     let callbacks = carved_rust::Callbacks {register_voxel: ext_register, deregister_voxel: ext_deregister};
-//     let callbacks_ptr = &callbacks as *const _;
+    {
+        let esvo: &carved_rust::ExternalSVO = unsafe { &*svo_ptr };
+        esvo.svo.assert_contains(vec![
+            (0. , 0. , 0. , 1, 1),
+            (0.5, 0. , 0. , 1, 2),
+            (0. , 0.5, 0. , 1, 1),
+            (0.5, 0.5, 0. , 1, 1),
+            (0. , 0. , 0.5, 1, 1),
+            (0.5, 0. , 0.5, 1, 1),
+            (0. , 0.5, 0.5, 1, 1),
+            (0.5, 0.5, 0.5, 1, 1)]);
+    }
 
-//     let svo_ptr = carved_rust::svo_create(1, callbacks_ptr);
+    let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(0.52, 2., 0.52), Vec3::new(0., -1., 0.));
+    assert!(maybe_hit.is_some != 0);
+    assert_approx_eq_eps!(maybe_hit.value, Vec3::new(0.52, 1., 0.52), 0.001);
 
-//     let index = &[1u8];
-//     carved_rust::svo_set_block(svo_ptr, index.as_ptr(), index.len(), 2);
+    let maybe_hit2 = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(1.52, 2., 0.52), Vec3::new(0., -1., 0.));
+    assert!(maybe_hit2.is_some == 0);
 
-//     // I can't actually (be bothered to) produce a extern "stdcall" fn(Vec3<f32>, i32, i32)
-//     // so cheat and replicate the code from carved_rust::on_voxels. Luckily (by design) it's a shallow wrapper.
-//     {
-//         //let esvo_ref: &carvedSVO = unsafe { &*svo_ptr };
-//         //let ref svo_ref = esvo_ref.svo;
-//         // svo_ref.assert_contains(vec![
-//         //     (0. , 0. , 0. , 1, 1),
-//         //     (0.5, 0. , 0. , 1, 2),
-//         //     (0. , 0.5, 0. , 1, 1),
-//         //     (0.5, 0.5, 0. , 1, 1),
-//         //     (0. , 0. , 0.5, 1, 1),
-//         //     (0.5, 0. , 0.5, 1, 1),
-//         //     (0. , 0.5, 0.5, 1, 1),
-//         //     (0.5, 0.5, 0.5, 1, 1)]);
-//     }
-
-//     let maybe_hit = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(0.52, 2., 0.52), Vec3::new(0., -1., 0.));
-//     assert!(maybe_hit.is_some != 0);
-//     assert_approx_eq_eps!(maybe_hit.value, Vec3::new(0.52, 1., 0.52), 0.001);
-
-//     let maybe_hit2 = carved_rust::svo_cast_ray(svo_ptr, Vec3::new(1.52, 2., 0.52), Vec3::new(0., -1., 0.));
-//     assert!(maybe_hit2.is_some == 0);
-
-//     carved_rust::svo_destroy(svo_ptr);
-//     panic!();
-// }
+    carved_rust::svo_destroy(svo_ptr);
+}
