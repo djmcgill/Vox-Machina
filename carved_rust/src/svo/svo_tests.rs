@@ -2,6 +2,7 @@
 
 use carved_rust;
 use nalgebra::{ApproxEq, Vec3, zero};
+use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use svo::*;
 
@@ -144,8 +145,62 @@ fn save_load() {
         (0.5, 0. , 0.5, 1, 1),
         (0. , 0.5, 0.5, 1, 0),
         (0.5, 0.5, 0.5, 1, 0)]);
+}
 
+#[test]
+fn register_blocks() {
+    let voxel_data = VoxelData::new(1);
+    let mut svo = SVO::new_voxel(voxel_data, 0);
 
+    let counter = Cell::new(1u32);
+    let deregistered: RefCell<Vec<u32>> = RefCell::new(vec![]);
+
+    {
+        let register = |_, _, _| {
+            let old_count = counter.get();
+            counter.set(old_count + 1);
+            old_count
+        };
+        let deregister = |id: u32| { deregistered.borrow_mut().push(id); };
+
+        svo.set_block(&register, &deregister, &[2], VoxelData::new(0));
+        svo.set_block(&register, &deregister, &[3], VoxelData::new(0));
+        svo.set_block(&register, &deregister, &[6], VoxelData::new(0));
+        svo.set_block(&register, &deregister, &[7], VoxelData::new(0));
+        svo.set_block(&register, &deregister, &[1, 3], VoxelData::new(2));
+    }
+
+    let deregistered = deregistered.into_inner();
+    let svo = svo;
+
+    match svo {
+        SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
+        SVO::Octants(ref octants) => {
+            assert_eq!(*octants[0], SVO::new_voxel(VoxelData::new(1),1));
+
+            match *octants[1] {
+                SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
+                SVO::Octants(ref sub_octants) => {
+                    assert_eq!(*sub_octants[0], SVO::new_voxel(VoxelData::new(1),13));
+                    assert_eq!(*sub_octants[1], SVO::new_voxel(VoxelData::new(1),14));
+                    assert_eq!(*sub_octants[2], SVO::new_voxel(VoxelData::new(1),15));
+                    assert_eq!(*sub_octants[3], SVO::new_voxel(VoxelData::new(2),21));
+                    assert_eq!(*sub_octants[4], SVO::new_voxel(VoxelData::new(1),17));
+                    assert_eq!(*sub_octants[5], SVO::new_voxel(VoxelData::new(1),18));
+                    assert_eq!(*sub_octants[6], SVO::new_voxel(VoxelData::new(1),19));
+                    assert_eq!(*sub_octants[7], SVO::new_voxel(VoxelData::new(1),20));
+                }
+            }
+
+            assert_eq!(*octants[2], SVO::new_voxel(VoxelData::new(0),9));
+            assert_eq!(*octants[3], SVO::new_voxel(VoxelData::new(0),10));
+            assert_eq!(*octants[4], SVO::new_voxel(VoxelData::new(1),5));
+            assert_eq!(*octants[5], SVO::new_voxel(VoxelData::new(1),6));
+            assert_eq!(*octants[6], SVO::new_voxel(VoxelData::new(0),11));
+            assert_eq!(*octants[7], SVO::new_voxel(VoxelData::new(0),12));
+        }
+    }
+    assert_eq!(deregistered, vec![0, 3, 4, 7, 8, 2, 16]);
 }
 
 impl SVO {
@@ -190,7 +245,6 @@ impl SVO {
         svo.set_block(register, deregister, &[7], VoxelData::new(0));
         svo
     }
-
 }
 
 

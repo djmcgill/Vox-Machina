@@ -6,6 +6,7 @@ use svo::*;
 const VOXEL_TAG: u8 = 1;
 const OCTANT_TAG: u8 = 2;
 
+// TODO: Read needs to take a RegisterVoxels callback.
 pub trait ReadSVO: Read {
     fn read_voxel(&mut self) -> Result<VoxelData> {
         let voxel_type = try! { self.read_i32::<LittleEndian>() };

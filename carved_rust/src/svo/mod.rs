@@ -4,6 +4,9 @@ pub mod cast_ray;
 pub mod set_block;
 pub mod save_load;
 
+#[cfg(test)]
+mod svo_tests;
+
 #[repr(C)] #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct VoxelData {
     pub voxel_type: i32
