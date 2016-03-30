@@ -19,7 +19,8 @@ impl SVO {
     pub fn set_block<R, D>(&mut self, register_voxel: R, deregister_voxel: D, index: &[u8], new_voxel_data: VoxelData)
             where R: Register, D: Deregister {
         let env = SetBlockEnv {
-            register_voxel: register_voxel, deregister_voxel: deregister_voxel, new_voxel_data: new_voxel_data};
+            register_voxel: register_voxel, deregister_voxel: deregister_voxel, new_voxel_data: new_voxel_data
+        };
         self.set_voxel_from(&env, index, zero(), 0);
     }
 
