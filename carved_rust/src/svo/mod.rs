@@ -3,6 +3,7 @@ use nalgebra::Vec3;
 pub mod cast_ray;
 pub mod set_block;
 pub mod save_load;
+pub mod generator;
 
 #[cfg(test)]
 mod svo_tests;

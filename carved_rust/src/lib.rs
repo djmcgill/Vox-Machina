@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[macro_use]
 extern crate nalgebra;
 extern crate byteorder; // could switch to bincode if needed
