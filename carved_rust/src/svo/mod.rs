@@ -34,7 +34,7 @@ impl SVO {
         SVO::Voxel { data: voxel_data, external_id: external_id }
     }
 
-    pub fn new_octants<F: Fn(u8) -> SVO>(make_octant: &F) -> SVO {
+    pub fn new_octants<F: Fn(u8) -> SVO>(make_octant: F) -> SVO {
         SVO::Octants([
             Box::new(make_octant(0)), Box::new(make_octant(1)),
             Box::new(make_octant(2)), Box::new(make_octant(3)),

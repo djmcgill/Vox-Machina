@@ -6,7 +6,7 @@ use std::u8;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct SubImage<'a> {
-	image: &'a Box<[u8]>,
+	image: &'a[u8],
 	image_width: u32,
 	x_0: u32,
 	x_n: u32,
@@ -17,7 +17,7 @@ struct SubImage<'a> {
 }
 
 impl<'a> SubImage<'a> {
-	pub fn new(image: &Box<[u8]>, width: u32, height: u32) -> SubImage {
+	pub fn new(image: &[u8], width: u32, height: u32) -> SubImage {
 		assert_eq!(image.len(), (width * height) as usize);
 		SubImage {
 			image: image, image_width: width,
@@ -34,15 +34,15 @@ impl<'a> SubImage<'a> {
 		self.y_n - self.y_0
 	}
 
-	fn rect(&self, x_0: u32, x_n: u32, y_0: u32, y_n: u32) -> SubImage {
+	fn rect(&self, x_0: u32, x_n: u32, y_0: u32, y_n: u32) -> SubImage<'a> {
 		SubImage { x_0: x_0, x_n: x_n, y_0: y_0, y_n: y_n, .. *self }
 	}
 
-	fn quads(&'a self) -> Option<[SubImage<'a>; 4]> {
+	fn quads(&self) -> Option<[SubImage<'a>; 4]> {
 		let half_width = self.width() / 2;
 		let half_height = self.height() / 2;
 
-		if half_width == 0 || half_height == 0 { return None; }
+		guard!(half_width != 0 && half_height != 0);
 
 		let ll = self.rect(self.x_0, self.x_0 + half_width, self.y_0, self.y_0 + half_height);
 		let lr = self.rect(self.x_0, self.x_0 + half_width, self.y_0 + half_height, self.y_n);
@@ -51,35 +51,21 @@ impl<'a> SubImage<'a> {
 		Some([ll, lr, rl, rr])
 	}
 
-	fn split_threshold(&'a self) -> Option<[SubImage<'a>; 2]> {
+	fn split_threshold(&self) -> Option<[SubImage<'a>; 2]> {
 		let half_range = (self.b_n - self.b_0) / 2;
-		if half_range == 0 { return None; }
+		guard!(half_range != 0);
 
 		let lower = SubImage { b_0: self.b_0, b_n: self.b_0 + half_range, .. *self };
 		let upper = SubImage { b_0: self.b_0 + half_range, b_n: self.b_n, .. *self };
 		Some([lower, upper])
 	}
 
-	pub fn octs(&'a self) -> Option<[SubImage<'a>; 8]> {
-		// error: `quads[..]` does not live long enough
-		//note: reference must be valid for the lifetime 'a as defined on the block at 63:52...
-		//...but borrowed value is only valid for the scope of parameters for function at 64:51
-		self.quads().and_then(|quads: [SubImage<'a>; 4]| {
-			let octs01 = quads[0].split_threshold().unwrap();
-			let octs23 = quads[1].split_threshold().unwrap();
-			let octs45 = quads[2].split_threshold().unwrap();
-			let octs67 = quads[3].split_threshold().unwrap();
-			let octs0: SubImage<'a> = octs01[0];
-			let octs1: SubImage<'a> = octs01[1];
-			let octs2: SubImage<'a> = octs23[0];
-			let octs3: SubImage<'a> = octs23[1];
-			let octs4: SubImage<'a> = octs45[0];
-			let octs5: SubImage<'a> = octs45[1];
-			let octs6: SubImage<'a> = octs67[0];
-			let octs7: SubImage<'a> = octs67[1];
-			let octs_all: [SubImage<'a>; 8] = [octs0, octs1, octs2, octs3, octs4, octs5, octs6, octs7];
-			Some(octs_all)
-		})
+	pub fn octs(&self) -> Option<[SubImage<'a>; 8]> {
+		let layers = get!(self.split_threshold());
+		let upper = get!(layers[0].quads());
+		let lower = get!(layers[1].quads());
+		Some([lower[0], lower[1], lower[2], lower[3],
+		      upper[0], upper[1], upper[2], upper[3]])
 	}
 
 	pub fn byte_avg(&self) -> u8 {
@@ -87,7 +73,7 @@ impl<'a> SubImage<'a> {
 			(self.x_0 .. self.x_n).map(|x| {
 				let ix = y*self.image_width + x;
 				self.image[ix as usize] as u32
-			}).fold(0u32, |x, y| x+y) // Dear Rust, fuck you.
+			}).fold(0u32, |x, y| x+y)
 		}).fold(0u32, |x, y| x+y);
 		(sum as usize / self.image.len()) as u8
 	}
@@ -96,21 +82,19 @@ impl<'a> SubImage<'a> {
 impl SVO {
 	pub fn height_map(depth: u32, image: &[u8], width: u32, height: u32) -> SVO {
 		assert_eq!(image.len(), (width * height) as usize);
-		//SVO::height_map_sub(depth, image, 0, width-1, 0, height-1, (u8::MAX / 2) as u16)
-		panic!()
+		SVO::height_map_sub(depth, SubImage::new(image, width, height))
 	}
 
 	fn height_map_sub(depth: u32, image: SubImage) -> SVO {
-		if depth == 0 {
-			// Make a voxel
-			//let sub_image_ixs = panic!() //: Iterator<Item=u32> = (y_0..y_n).flatMap(|y| (x_0..x_n).map(|x| )).collect();
-			let voxel_type = panic!(); //if byte_avg(image, sub_image_ixs) as u16 >= pixel_threshold { 1 } else { 0 };
-			SVO::new_voxel(VoxelData::new(voxel_type), 0)
-		} else {
-			let octants = image.quads();
+		match image.octs() {
+			Some(sub_images) if depth > 0 => // Recurs
+				SVO::new_octants(|ix| SVO::height_map_sub(depth-1, sub_images[ix as usize])),
 
-			panic!()
-			//SVO::Octants([])
+			_ => { // Make a voxel here
+				let threshold = image.b_0 + (image.b_n - image.b_0) / 2;
+				let voxel_type = if image.byte_avg() >= threshold { 1 } else { 0 };
+				SVO::new_voxel(VoxelData::new(voxel_type), 0)
+			}
 		}
 	}
 }
