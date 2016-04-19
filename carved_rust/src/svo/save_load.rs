@@ -55,7 +55,6 @@ pub trait ReadSVO: Read {
         // TODO: register_all the SVO
         Ok(stack.pop().unwrap())
     }
-
 }
 
 impl<R: ReadBytesExt> ReadSVO for R {}

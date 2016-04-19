@@ -6,6 +6,8 @@ use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use svo::*;
 
+use std::u8;
+
 fn register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
 fn deregister(_: u32) {}
 
@@ -203,6 +205,45 @@ fn register_blocks() {
     assert_eq!(deregistered, vec![0, 3, 4, 7, 8, 2, 16]);
 }
 
+#[test]
+fn flat_height_map() {
+    let width = 4;
+    let height = 4;
+
+    let image: [u8; 16] = [127u8; 16];
+    let svo = SVO::height_map(1, &image, width, height);
+    svo.assert_contains(vec![
+        (0. , 0. , 0. , 1, 1),
+        (0.5, 0. , 0. , 1, 1),
+        (0. , 0.5, 0. , 1, 0),
+        (0.5, 0.5, 0. , 1, 0),
+        (0. , 0. , 0.5, 1, 1),
+        (0.5, 0. , 0.5, 1, 1),
+        (0. , 0.5, 0.5, 1, 0),
+        (0.5, 0.5, 0.5, 1, 0)
+    ]);
+}
+
+#[test]
+fn full_height_map() {
+    let width = 4;
+    let height = 4;
+
+    let image: [u8; 16] = [u8::MAX; 16];
+    let svo = SVO::height_map(1, &image, width, height);
+    svo.assert_contains(vec![(0., 0., 0., 0, 1)]);
+}
+
+#[test]
+fn empty_height_map() {
+    let width = 4;
+    let height = 4;
+
+    let image: [u8; 16] = [0u8; 16];
+    let svo = SVO::height_map(1, &image, width, height);
+    svo.assert_contains(vec![(0., 0., 0., 0, 0)]);
+}
+
 impl SVO {
     fn assert_contains(&self, expected: Vec<(f32, f32, f32, i32, i32)>) {
         let mut results_vec: Vec<(f32, f32, f32, i32, i32)> = Vec::new();
@@ -210,6 +251,8 @@ impl SVO {
         let results = results_vec;
 
         assert_eq!(results.len(), expected.len());
+        println!("expected: {:?}", expected);
+        println!("actual: {:?}", results);
 
         for (actual_element, expected_element) in results.iter().zip(expected.iter()) {
             let &(x, y, z, depth, voxel_type) = actual_element;

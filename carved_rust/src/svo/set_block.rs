@@ -57,10 +57,7 @@ impl SVO {
                     octants[ix as usize].set_voxel_from(env, rest, new_origin, depth+1);
                 }
 
-                // Then if we have 8 voxels of the same type, combine them.
-                if let Some(combined_voxel_data) = self.get_octants().and_then(combine_voxels) {
-                    self.recombine_octants(&env.register_voxel, &env.deregister_voxel, origin, depth, combined_voxel_data);
-                }
+                self.recombine_svo(&env.register_voxel, &env.deregister_voxel, origin, depth);
             }
         }
     }
@@ -79,15 +76,17 @@ impl SVO {
         };
     }
 
-    fn recombine_octants<R, D>(&mut self, register_voxel: &R, deregister_voxel: &D, origin: Vec3<f32>, depth: i32, voxel_data: VoxelData)
+    pub fn recombine_svo<R, D>(&mut self, register_voxel: &R, deregister_voxel: &D, origin: Vec3<f32>, depth: i32)
             where R: Register, D: Deregister {
-        *self = match *self {
-            SVO::Octants(ref mut octants) => {
-                for octant in octants { octant.deregister_all(deregister_voxel); }
-                let uid = register_voxel(origin, depth, voxel_data);
-                SVO::new_voxel(voxel_data, uid)
-            },
-            _ => panic!("recombine_octants called on non-octants!")
+        if let Some(combined_voxel_data) = self.get_octants().and_then(combine_voxels) {
+             *self = match *self {
+                SVO::Octants(ref mut octants) => {
+                    for octant in octants { octant.deregister_all(deregister_voxel); }
+                    let uid = register_voxel(origin, depth, combined_voxel_data);
+                    SVO::new_voxel(combined_voxel_data, uid)
+                },
+                _ => unreachable!()
+            }
         }
     }
 

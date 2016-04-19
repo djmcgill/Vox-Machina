@@ -4,6 +4,8 @@ use svo::*;
 
 use std::u8;
 
+use nalgebra::zero;
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct SubImage<'a> {
 	image: &'a[u8],
@@ -34,6 +36,15 @@ impl<'a> SubImage<'a> {
 		self.y_n - self.y_0
 	}
 
+	pub fn byte_sum(&self) -> u64 {
+		(self.y_0 .. self.y_n).map(|y| {
+			(self.x_0 .. self.x_n).map(|x| {
+				let ix = y*self.image_width + x;
+				self.image[ix as usize] as u64
+			}).fold(0u64, |x, y| x+y)
+		}).fold(0u64, |x, y| x+y)
+	}
+
 	fn rect(&self, x_0: u32, x_n: u32, y_0: u32, y_n: u32) -> SubImage<'a> {
 		SubImage { x_0: x_0, x_n: x_n, y_0: y_0, y_n: y_n, .. *self }
 	}
@@ -55,27 +66,24 @@ impl<'a> SubImage<'a> {
 		let half_range = (self.b_n - self.b_0) / 2;
 		guard!(half_range != 0);
 
-		let lower = SubImage { b_0: self.b_0, b_n: self.b_0 + half_range, .. *self };
-		let upper = SubImage { b_0: self.b_0 + half_range, b_n: self.b_n, .. *self };
-		Some([lower, upper])
+		let darker = SubImage { b_0: self.b_0, b_n: self.b_0 + half_range, .. *self };
+		let lighter = SubImage { b_0: self.b_0 + half_range, b_n: self.b_n, .. *self };
+		Some([darker, lighter])
 	}
 
 	pub fn octs(&self) -> Option<[SubImage<'a>; 8]> {
 		let layers = get!(self.split_threshold());
-		let upper = get!(layers[0].quads());
-		let lower = get!(layers[1].quads());
-		Some([lower[0], lower[1], lower[2], lower[3],
-		      upper[0], upper[1], upper[2], upper[3]])
+		let darker = get!(layers[0].quads());
+		let lighter = get!(layers[1].quads());
+		Some([darker[0], darker[1], lighter[0], lighter[1],
+		      darker[2], darker[3], lighter[2], lighter[3]])
 	}
 
 	pub fn byte_avg(&self) -> u8 {
-		let sum: u32 = (self.y_0 .. self.y_n).map(|y| {
-			(self.x_0 .. self.x_n).map(|x| {
-				let ix = y*self.image_width + x;
-				self.image[ix as usize] as u32
-			}).fold(0u32, |x, y| x+y)
-		}).fold(0u32, |x, y| x+y);
-		(sum as usize / self.image.len()) as u8
+		let sum = self.byte_sum();
+		let sub_len = self.width() * self.height();
+		let avg = (sum / (sub_len as u64)) as u8;
+		avg
 	}
 }
 
@@ -87,12 +95,17 @@ impl SVO {
 
 	fn height_map_sub(depth: u32, image: SubImage) -> SVO {
 		match image.octs() {
-			Some(sub_images) if depth > 0 => // Recurs
-				SVO::new_octants(|ix| SVO::height_map_sub(depth-1, sub_images[ix as usize])),
+			Some(sub_images) if depth > 0 => { // Recurse
+				let mut svo = SVO::new_octants(|ix| {
+					SVO::height_map_sub(depth-1, sub_images[ix as usize])
+				});
+				svo.recombine_svo(&|_, _, _| 0, &|_| {}, zero(), 0);
+				svo
+			},
 
 			_ => { // Make a voxel here
 				let threshold = image.b_0 + (image.b_n - image.b_0) / 2;
-				let voxel_type = if image.byte_avg() >= threshold { 1 } else { 0 };
+				let voxel_type = if image.byte_avg() <= threshold { 0 } else { 1 };
 				SVO::new_voxel(VoxelData::new(voxel_type), 0)
 			}
 		}
