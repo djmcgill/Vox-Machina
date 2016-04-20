@@ -1,12 +1,6 @@
 use nalgebra::{Vec3, zero};
 use svo::*;
 
-pub trait Register: Fn(Vec3<f32>, i32, VoxelData) -> u32 {}
-impl<R: Fn(Vec3<f32>, i32, VoxelData) -> u32> Register for R {}
-
-pub trait Deregister: Fn(u32) {}
-impl<D: Fn(u32)> Deregister for D {}
-
 struct SetBlockEnv<R: Register, D: Deregister> {
     pub register_voxel: R,
     pub deregister_voxel: D,
@@ -87,14 +81,6 @@ impl SVO {
                 },
                 _ => unreachable!()
             }
-        }
-    }
-
-    fn deregister_all<D: Deregister>(&mut self, deregister_voxel: &D) {
-        match *self {
-            SVO::Voxel { external_id, .. } => deregister_voxel(external_id),
-            SVO::Octants (ref mut octants) =>
-                for octant in octants { octant.deregister_all(deregister_voxel); }
         }
     }
 }
