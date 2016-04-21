@@ -10,10 +10,7 @@ use nalgebra::{Vec3, zero};
 // mod svo_tests;
 
 pub trait Register: Fn(Vec3<f32>, i32, VoxelData) -> u32 {}
-impl<R: Fn(Vec3<f32>, i32, VoxelData) -> u32> Register for R {}
-
 pub trait Deregister: Fn(u32) {}
-impl<D: Fn(u32)> Deregister for D {}
 
 #[repr(C)] #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct VoxelData {
@@ -56,11 +53,10 @@ impl SVO<Unregistered> {
 
     fn register_from<R: Register>(self, register: &R, origin: Vec3<f32>, depth: i32) -> SVO<Registered> {
         match self {
-            SVO::Octants (octants) => SVO::new_octants(|ix| {
+            SVO::Octants (mut octants) => SVO::new_octants(|ix| {
                 let new_origin = origin + offset(ix, depth);
-                panic!() //octants[ix as usize].register_from(register, new_origin, depth+1)
-
-
+                let octant = unsafe { mem::replace(&mut octants[ix as usize], mem::uninitialized()) };
+                octant.register_from(register, new_origin, depth+1)
             }),
             SVO::Voxel { data, .. } => {
                 let uid = register(origin, depth, data);
@@ -77,26 +73,17 @@ impl SVO<Registered> {
                 deregister_voxel(external_id);
                 SVO::Voxel { data: data, registration: Unregistered }
             },
-            SVO::Octants (mut octants) => {
-                let new0 = unsafe { mem::replace(&mut octants[0], mem::uninitialized()).deregister(deregister_voxel) };
-                let new1 = unsafe { mem::replace(&mut octants[1], mem::uninitialized()).deregister(deregister_voxel) };
-                let new2 = unsafe { mem::replace(&mut octants[2], mem::uninitialized()).deregister(deregister_voxel) };
-                let new3 = unsafe { mem::replace(&mut octants[3], mem::uninitialized()).deregister(deregister_voxel) };
-                let new4 = unsafe { mem::replace(&mut octants[4], mem::uninitialized()).deregister(deregister_voxel) };
-                let new5 = unsafe { mem::replace(&mut octants[5], mem::uninitialized()).deregister(deregister_voxel) };
-                let new6 = unsafe { mem::replace(&mut octants[6], mem::uninitialized()).deregister(deregister_voxel) };
-                let new7 = unsafe { mem::replace(&mut octants[7], mem::uninitialized()).deregister(deregister_voxel) };
-                SVO::Octants([
-                    Box::new(new0), Box::new(new1), Box::new(new2), Box::new(new3),
-                    Box::new(new4), Box::new(new5), Box::new(new6), Box::new(new7)
-                ])
-            }
+            SVO::Octants (mut octants) =>
+                SVO::new_octants(|ix: u8| {
+                    let octant = unsafe { mem::replace(&mut octants[ix as usize], mem::uninitialized()) };
+                    octant.deregister(deregister_voxel)
+                })
         }
     }
 }
 
 impl<R: RegistrationTrait> SVO<R> {
-    pub fn new_octants<F: Fn(u8) -> SVO<R>>(make_octant: F) -> SVO<R> {
+    pub fn new_octants<F: FnMut(u8) -> SVO<R>>(mut make_octant: F) -> SVO<R> {
         SVO::Octants([
             Box::new(make_octant(0)), Box::new(make_octant(1)),
             Box::new(make_octant(2)), Box::new(make_octant(3)),
