@@ -1,7 +1,7 @@
 pub mod registration;
 pub mod voxel_data;
 
-// mod set_block;
+mod set_block;
 mod cast_ray;
 
 #[cfg(test)]
@@ -14,7 +14,7 @@ use std::mem;
 
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 #[derive(Debug, PartialEq)]
-pub enum SVO<R: RegistrationTrait> {
+pub enum SVO<R: RegistrationState> {
     Voxel { data: VoxelData, registration: R },
 
     // For a given point (x, y, z), the index of its octant is
@@ -27,20 +27,24 @@ impl SVO<Unregistered> {
         SVO::Voxel { data: voxel_data, registration: Unregistered::new() }
     }
 
+    pub fn register_origin(mut self, registration_fns: &RegistrationFunctions) -> SVO<Registered> {
+        self.register_from(registration_fns, zero(), 0)
+    }
+
     pub fn register_from(
             mut self,
-            registration_fns: &RegistrationFunctions<Unregistered>,
+            registration_fns: &RegistrationFunctions,
             origin: Vec3<f32>,
             depth: i32
         ) -> SVO<Registered> {
 
-        self.register_helper(registration_fns, zero(), 0);
+        self.register_helper(registration_fns, origin, depth);
         unsafe { mem::transmute(self) }
     }
 
     fn register_helper(
             &mut self,
-            registration_fns: &RegistrationFunctions<Unregistered>,
+            registration_fns: &RegistrationFunctions,
             origin: Vec3<f32>,
             depth: i32) {
         match *self {
@@ -48,31 +52,33 @@ impl SVO<Unregistered> {
                 let new_origin = origin + offset(ix, depth);
                 octants[ix as usize].register_helper(registration_fns, new_origin, depth+1);
             },
-            SVO::Voxel { data, registration } => {
-                let uid = (registration_fns.register)(origin, depth, data);
-                *self = SVO::Voxel { data: data, registration: Unregistered { _padding: uid } };
+            SVO::Voxel { data, .. } => {
+                let registration: Unregistered = unsafe {
+                    mem::transmute((registration_fns.register)(origin, depth, data))
+                };
+                *self = SVO::Voxel { data: data, registration: registration };
             }
         }
     }
 }
 
 impl SVO<Registered> {
-    fn deregister_helper(&self, registration_fns: &RegistrationFunctions<Registered>) {
+    fn deregister_helper(&self, registration_fns: &RegistrationFunctions) {
         match *self {
-            SVO::Voxel { registration: Registered { external_id }, .. } =>
-                (registration_fns.deregister)(external_id),
+            SVO::Voxel { registration, .. } =>
+                (registration_fns.deregister)(registration),
             SVO::Octants (ref octants) =>
                 for octant in octants { octant.deregister_helper(registration_fns); }
         }
     }
 
-    fn deregister(self, registration_fns: &RegistrationFunctions<Registered>) -> SVO<Unregistered> {
+    fn deregister(self, registration_fns: &RegistrationFunctions) -> SVO<Unregistered> {
         self.deregister_helper(registration_fns);
         unsafe { mem::transmute(self) }
     }
 }
 
-impl<R: RegistrationTrait> SVO<R> {
+impl<R: RegistrationState> SVO<R> {
     pub fn new_octants<F: FnMut(u8) -> SVO<R>>(mut make_octant: F) -> SVO<R> {
         SVO::Octants([
             Box::new(make_octant(0)), Box::new(make_octant(1)),

@@ -1,6 +1,5 @@
 use svo::voxel_data::VoxelData;
 use nalgebra::Vec3;
-use std::marker::PhantomData;
 
 pub type RegisterExtern = extern "stdcall" fn(Vec3<f32>, i32, VoxelData) -> u32;
 pub type DeregisterExtern = extern "stdcall" fn(u32);
@@ -13,32 +12,30 @@ impl Unregistered {
     pub fn new() -> Unregistered { Unregistered { _padding: 0 } }
 }
 
-pub trait RegistrationTrait {}
-impl RegistrationTrait for Registered {}
-impl RegistrationTrait for Unregistered {}
+pub trait RegistrationState {}
+impl RegistrationState for Registered {}
+impl RegistrationState for Unregistered {}
 
-pub struct RegistrationFunctions<T: RegistrationTrait> {
-    pub register: Box<Fn(Vec3<f32>, i32, VoxelData) -> u32>,
-    pub deregister: Box<Fn(u32)>,
-    registration_trait: PhantomData<T>
+pub struct RegistrationFunctions<'a> {
+    pub register: Box<Fn(Vec3<f32>, i32, VoxelData) -> Registered + 'a>,
+    pub deregister: Box<Fn(Registered) + 'a>
 }
 
-impl<T: RegistrationTrait> RegistrationFunctions<T> {
-	pub fn dummy_registration() -> RegistrationFunctions<Unregistered> {
+impl<'a> RegistrationFunctions<'a> {
+	pub fn dummy() -> RegistrationFunctions<'a> {
 		RegistrationFunctions {
-			register: Box::new(|_, _, _| 0),
-			deregister: Box::new(|_| {}),
-			registration_trait: PhantomData
+			register: Box::new(|_, _, _| Registered { external_id: 0}),
+			deregister: Box::new(|_| {})
 		}
 	}
 
-	pub fn external_registration(ext_register: RegisterExtern,
-		                         ext_deregister: DeregisterExtern
-		                         ) -> RegistrationFunctions<Registered> {
+	pub fn external(
+			ext_register: RegisterExtern,
+		    ext_deregister: DeregisterExtern) -> RegistrationFunctions<'a> {
 		RegistrationFunctions {
-			register: Box::new(move |origin, depth, data| ext_register(origin, depth, data)),
-			deregister: Box::new(move |uid| ext_deregister(uid)),
-			registration_trait: PhantomData
+			register: Box::new(move |origin, depth, data|
+				Registered{ external_id: ext_register(origin, depth, data) }),
+			deregister: Box::new(move |Registered{external_id}| ext_deregister(external_id))
 		}
 	}
 }

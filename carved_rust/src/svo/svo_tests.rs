@@ -5,7 +5,6 @@ use nalgebra::{ApproxEq, Vec3, zero};
 use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use svo::*;
-
 use std::u8;
 
 fn register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
@@ -68,62 +67,61 @@ fn deregister(_: u32) {}
 //         (0.5, 0.5, 0.5, 1, 0)]);
 // }
 
-// #[test]
-// fn register_blocks() {
-//     let register: &Register<Output=u32> = &|_: Vec3<f32>, _: i32, _: VoxelData| 0;
-//     let voxel_data = VoxelData::new(1);
-//     let mut svo = SVO::new_voxel(voxel_data).register_from::<Fn(Vec3<f32>, i32, VoxelData) -> u32>(register, zero(), 0);
+#[test]
+fn register_blocks() {
+    let voxel_data = VoxelData::new(1);
 
-//     let counter = Cell::new(1u32);
-//     let deregistered: RefCell<Vec<u32>> = RefCell::new(vec![]);
+	let counter = Cell::new(0u32);
+	let deregistered_vec: RefCell<Vec<u32>> = RefCell::new(vec![]);
 
-//     {
-//         let register = |_, _, _| {
-//             let old_count = counter.get();
-//             counter.set(old_count + 1);
-//             old_count
-//         };
-//         let deregister = |id: u32| { deregistered.borrow_mut().push(id); };
+    let svo = {
+    	let registration_fns = RegistrationFunctions {
+	    		register: Box::new(move |_, _, _| {
+	            	let old_count = counter.get();
+	            	counter.set(old_count + 1);
+	            	Registered {external_id: old_count}}),
+	    		deregister: Box::new(|Registered{external_id}| {
+	    			deregistered_vec.borrow_mut().push(external_id)})
+    	};
 
-//         svo.set_block(&register, &deregister, &[2], VoxelData::new(0));
-//         svo.set_block(&register, &deregister, &[3], VoxelData::new(0));
-//         svo.set_block(&register, &deregister, &[6], VoxelData::new(0));
-//         svo.set_block(&register, &deregister, &[7], VoxelData::new(0));
-//         svo.set_block(&register, &deregister, &[1, 3], VoxelData::new(2));
-//     }
+    	let mut svo = SVO::new_voxel(VoxelData::new(1)).register_origin(&registration_fns);
+        svo = svo.set_block(&registration_fns, &[2], VoxelData::new(0));
+        svo = svo.set_block(&registration_fns, &[3], VoxelData::new(0));
+        svo = svo.set_block(&registration_fns, &[6], VoxelData::new(0));
+        svo = svo.set_block(&registration_fns, &[7], VoxelData::new(0));
+        svo = svo.set_block(&registration_fns, &[1, 3], VoxelData::new(2));
+        svo
+    };
+    let deregistered_vec = deregistered_vec.into_inner();
 
-//     let deregistered = deregistered.into_inner();
-//     let svo = svo;
+    match svo {
+        SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
+        SVO::Octants(ref octants) => {
+        	octants[0].assert_is_voxel(VoxelData::new(1), Registered{external_id: 1});
 
-//     match svo {
-//         SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
-//         SVO::Octants(ref octants) => {
-//             assert_eq!(*octants[0], SVO::new_voxel(VoxelData::new(1),1));
-
-//             match *octants[1] {
-//                 SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
-//                 SVO::Octants(ref sub_octants) => {
-//                     assert_eq!(*sub_octants[0], SVO::new_voxel(VoxelData::new(1),13));
-//                     assert_eq!(*sub_octants[1], SVO::new_voxel(VoxelData::new(1),14));
-//                     assert_eq!(*sub_octants[2], SVO::new_voxel(VoxelData::new(1),15));
-//                     assert_eq!(*sub_octants[3], SVO::new_voxel(VoxelData::new(2),21));
-//                     assert_eq!(*sub_octants[4], SVO::new_voxel(VoxelData::new(1),17));
-//                     assert_eq!(*sub_octants[5], SVO::new_voxel(VoxelData::new(1),18));
-//                     assert_eq!(*sub_octants[6], SVO::new_voxel(VoxelData::new(1),19));
-//                     assert_eq!(*sub_octants[7], SVO::new_voxel(VoxelData::new(1),20));
-//                 }
-//             }
-
-//             assert_eq!(*octants[2], SVO::new_voxel(VoxelData::new(0),9));
-//             assert_eq!(*octants[3], SVO::new_voxel(VoxelData::new(0),10));
-//             assert_eq!(*octants[4], SVO::new_voxel(VoxelData::new(1),5));
-//             assert_eq!(*octants[5], SVO::new_voxel(VoxelData::new(1),6));
-//             assert_eq!(*octants[6], SVO::new_voxel(VoxelData::new(0),11));
-//             assert_eq!(*octants[7], SVO::new_voxel(VoxelData::new(0),12));
-//         }
-//     }
-//     assert_eq!(deregistered, vec![0, 3, 4, 7, 8, 2, 16]);
-// }
+            match *octants[1] {
+                SVO::Voxel{ .. } => panic!("Unexpected Voxel found"),
+                SVO::Octants(ref sub_octants) => {
+                    sub_octants[0].assert_is_voxel(VoxelData::new(1), Registered{external_id: 13});
+                    sub_octants[1].assert_is_voxel(VoxelData::new(1), Registered{external_id: 14});
+                    sub_octants[2].assert_is_voxel(VoxelData::new(1), Registered{external_id: 15});
+                    sub_octants[3].assert_is_voxel(VoxelData::new(2), Registered{external_id: 21});
+                    sub_octants[4].assert_is_voxel(VoxelData::new(1), Registered{external_id: 17});
+                    sub_octants[5].assert_is_voxel(VoxelData::new(1), Registered{external_id: 18});
+                    sub_octants[6].assert_is_voxel(VoxelData::new(1), Registered{external_id: 19});
+                    sub_octants[7].assert_is_voxel(VoxelData::new(1), Registered{external_id: 20});
+                }
+            }
+            octants[2].assert_is_voxel(VoxelData::new(0), Registered{external_id: 9});
+            octants[3].assert_is_voxel(VoxelData::new(0), Registered{external_id: 10});
+            octants[4].assert_is_voxel(VoxelData::new(1), Registered{external_id: 5});
+            octants[5].assert_is_voxel(VoxelData::new(1), Registered{external_id: 6});
+            octants[6].assert_is_voxel(VoxelData::new(0), Registered{external_id: 11});
+            octants[7].assert_is_voxel(VoxelData::new(0), Registered{external_id: 12});
+        }
+    }
+    assert_eq!(deregistered_vec, vec![0, 3, 4, 7, 8, 2, 16]);
+}
 
 // #[test]
 // fn flat_height_map() {
@@ -164,54 +162,66 @@ fn deregister(_: u32) {}
 //     svo.assert_contains(vec![(0., 0., 0., 0, 0)]);
 // }
 
-// impl<R: RegistrationTrait> SVO<R> {
-//     fn assert_contains(&self, expected: Vec<(f32, f32, f32, i32, i32)>) {
-//         let mut results_vec: Vec<(f32, f32, f32, i32, i32)> = Vec::new();
-//         self.collect_svo(&mut results_vec, zero(), 0);
-//         let results = results_vec;
+impl SVO<Registered> {
+	fn assert_is_voxel(&self, expected_data: VoxelData, expected_registration: Registered) {
+		match *self {
+			SVO::Octants(_) => panic!("Found Octants when expecting a Voxel!"),
+			SVO::Voxel{ data, registration } => {
+				assert_eq!(data, expected_data);
+				assert_eq!(registration, expected_registration);
+			}
+		}
+	}
+}
 
-//         assert_eq!(results.len(), expected.len());
-//         println!("expected: {:?}", expected);
-//         println!("actual: {:?}", results);
+impl<R: RegistrationState> SVO<R> {
+    fn assert_contains(&self, expected: Vec<(f32, f32, f32, i32, i32)>) {
+        let mut results_vec: Vec<(f32, f32, f32, i32, i32)> = Vec::new();
+        self.collect_svo(&mut results_vec, zero(), 0);
+        let results = results_vec;
 
-//         for (actual_element, expected_element) in results.iter().zip(expected.iter()) {
-//             let &(x, y, z, depth, voxel_type) = actual_element;
-//             let &(x_, y_, z_, depth_, voxel_type_) = expected_element;
+        assert_eq!(results.len(), expected.len());
+        println!("expected: {:?}", expected);
+        println!("actual: {:?}", results);
 
-//             assert_approx_eq_eps!(x, x_, 0.01);
-//             assert_approx_eq_eps!(y, y_, 0.01);
-//             assert_approx_eq_eps!(z, z_, 0.01);
-//             assert_eq!(depth, depth_);
-//             assert_eq!(voxel_type, voxel_type_);
-//         }
-//     }
+        for (actual_element, expected_element) in results.iter().zip(expected.iter()) {
+            let &(x, y, z, depth, voxel_type) = actual_element;
+            let &(x_, y_, z_, depth_, voxel_type_) = expected_element;
 
-//     fn collect_svo(&self, results_vec: &mut Vec<(f32, f32, f32, i32, i32)>, origin: Vec3<f32>, depth: i32) {
-//         match *self {
-//             SVO::Voxel { data: VoxelData { voxel_type, .. }, .. } =>
-//                 results_vec.push((origin.x, origin.y, origin.z, depth, voxel_type)),
-//             SVO::Octants (ref octants) => {
-//                 for ix in 0..8 {
-//                     let new_origin = origin + offset(ix, depth);
-//                     octants[ix as usize].collect_svo(results_vec, new_origin, depth + 1);
-//                 }
-//             }
+            assert_approx_eq_eps!(x, x_, 0.01);
+            assert_approx_eq_eps!(y, y_, 0.01);
+            assert_approx_eq_eps!(z, z_, 0.01);
+            assert_eq!(depth, depth_);
+            assert_eq!(voxel_type, voxel_type_);
+        }
+    }
 
-//         }
-//     }
-// }
+    fn collect_svo(&self, results_vec: &mut Vec<(f32, f32, f32, i32, i32)>, origin: Vec3<f32>, depth: i32) {
+        match *self {
+            SVO::Voxel { data: VoxelData { voxel_type, .. }, .. } =>
+                results_vec.push((origin.x, origin.y, origin.z, depth, voxel_type)),
+            SVO::Octants (ref octants) => {
+                for ix in 0..8 {
+                    let new_origin = origin + offset(ix, depth);
+                    octants[ix as usize].collect_svo(results_vec, new_origin, depth + 1);
+                }
+            }
 
-impl SVO<Unregistered> {
-    pub fn floor() -> SVO<Unregistered> {
-        let mut svo = SVO::new_voxel(VoxelData::new(1));
-        // svo.set_block(&register, deregister, &[2], VoxelData::new(0));
-        // svo.set_block(register, deregister, &[3], VoxelData::new(0));
-        // svo.set_block(register, deregister, &[6], VoxelData::new(0));
-        // svo.set_block(register, deregister, &[7], VoxelData::new(0));
-        svo
+        }
     }
 }
 
+impl SVO<Unregistered> {
+    pub fn floor() -> SVO<Registered> {
+        let registration_fns = &RegistrationFunctions::dummy();
+        let mut svo = SVO::new_voxel(VoxelData::new(1)).register_origin(registration_fns);
+        svo = svo.set_block(registration_fns, &[2], VoxelData::new(0));
+        svo = svo.set_block(registration_fns, &[3], VoxelData::new(0));
+        svo = svo.set_block(registration_fns, &[6], VoxelData::new(0));
+        svo = svo.set_block(registration_fns, &[7], VoxelData::new(0));
+        svo
+    }
+}
 
 // //=== FFI tests ===
 // extern "stdcall" fn ext_register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }

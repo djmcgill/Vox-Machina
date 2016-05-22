@@ -4,7 +4,7 @@ use svo::*;
 #[cfg(test)]
 mod tests;
 
-impl<R: RegistrationTrait> SVO<R> {
+impl<R: RegistrationState> SVO<R> {
     // Cast a ray into the octree and return the position of collision with a non-type-zero voxel (if any).
     // x = t*d + o where t = length of ray.
     // t = (x-o)/d
