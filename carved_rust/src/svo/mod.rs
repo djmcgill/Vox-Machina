@@ -1,36 +1,16 @@
-use std::mem;
+pub mod registration;
+pub mod voxel_data;
+
+// mod set_block;
+mod cast_ray;
+
+#[cfg(test)]
+mod svo_tests;
+
 use nalgebra::{Vec3, zero};
-
-// pub mod cast_ray;
-// pub mod set_block;
-// pub mod save_load;
-// pub mod generator;
-
-// #[cfg(test)]
-// mod svo_tests;
-
-pub trait Register: Fn(Vec3<f32>, i32, VoxelData) -> u32 {}
-pub trait Deregister: Fn(u32) {}
-
-#[repr(C)] #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct VoxelData {
-    pub voxel_type: i32
-}
-
-impl VoxelData {
-    pub fn new(voxel_type: i32) -> VoxelData {
-        VoxelData { voxel_type: voxel_type }
-    }
-}
-
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Registered { pub external_id: u32 }
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct Unregistered;
-
-pub trait RegistrationTrait {}
-impl RegistrationTrait for Registered {}
-impl RegistrationTrait for Unregistered {}
+pub use self::registration::*;
+pub use self::voxel_data::VoxelData;
+use std::mem;
 
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 #[derive(Debug, PartialEq)]
@@ -44,41 +24,51 @@ pub enum SVO<R: RegistrationTrait> {
 
 impl SVO<Unregistered> {
     pub fn new_voxel(voxel_data: VoxelData) -> SVO<Unregistered> {
-        SVO::Voxel { data: voxel_data, registration: Unregistered }
+        SVO::Voxel { data: voxel_data, registration: Unregistered::new() }
     }
 
-    pub fn register<R: Register>(self, register: R) -> SVO<Registered> {
-        self.register_from(&register, zero(), 0)
+    pub fn register_from(
+            mut self,
+            registration_fns: &RegistrationFunctions<Unregistered>,
+            origin: Vec3<f32>,
+            depth: i32
+        ) -> SVO<Registered> {
+
+        self.register_helper(registration_fns, zero(), 0);
+        unsafe { mem::transmute(self) }
     }
 
-    fn register_from<R: Register>(self, register: &R, origin: Vec3<f32>, depth: i32) -> SVO<Registered> {
-        match self {
-            SVO::Octants (mut octants) => SVO::new_octants(|ix| {
+    fn register_helper(
+            &mut self,
+            registration_fns: &RegistrationFunctions<Unregistered>,
+            origin: Vec3<f32>,
+            depth: i32) {
+        match *self {
+            SVO::Octants (ref mut octants) => for ix in 0..8 {
                 let new_origin = origin + offset(ix, depth);
-                let octant = unsafe { mem::replace(&mut octants[ix as usize], mem::uninitialized()) };
-                octant.register_from(register, new_origin, depth+1)
-            }),
-            SVO::Voxel { data, .. } => {
-                let uid = register(origin, depth, data);
-                SVO::Voxel { data: data, registration: Registered { external_id: uid } }
+                octants[ix as usize].register_helper(registration_fns, new_origin, depth+1);
+            },
+            SVO::Voxel { data, registration } => {
+                let uid = (registration_fns.register)(origin, depth, data);
+                *self = SVO::Voxel { data: data, registration: Unregistered { _padding: uid } };
             }
         }
     }
 }
 
 impl SVO<Registered> {
-    fn deregister<D: Deregister>(self, deregister_voxel: &D) -> SVO<Unregistered> {
-        match self {
-            SVO::Voxel { registration: Registered { external_id }, data } => {
-                deregister_voxel(external_id);
-                SVO::Voxel { data: data, registration: Unregistered }
-            },
-            SVO::Octants (mut octants) =>
-                SVO::new_octants(|ix: u8| {
-                    let octant = unsafe { mem::replace(&mut octants[ix as usize], mem::uninitialized()) };
-                    octant.deregister(deregister_voxel)
-                })
+    fn deregister_helper(&self, registration_fns: &RegistrationFunctions<Registered>) {
+        match *self {
+            SVO::Voxel { registration: Registered { external_id }, .. } =>
+                (registration_fns.deregister)(external_id),
+            SVO::Octants (ref octants) =>
+                for octant in octants { octant.deregister_helper(registration_fns); }
         }
+    }
+
+    fn deregister(self, registration_fns: &RegistrationFunctions<Registered>) -> SVO<Unregistered> {
+        self.deregister_helper(registration_fns);
+        unsafe { mem::transmute(self) }
     }
 }
 

@@ -1,7 +1,10 @@
 use nalgebra::{Vec3, Norm, Iterable};
 use svo::*;
 
-impl SVO {
+#[cfg(test)]
+mod tests;
+
+impl<R: RegistrationTrait> SVO<R> {
     // Cast a ray into the octree and return the position of collision with a non-type-zero voxel (if any).
     // x = t*d + o where t = length of ray.
     // t = (x-o)/d

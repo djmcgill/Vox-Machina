@@ -4,9 +4,6 @@ use std::mem::transmute;
 use std::slice;
 use nalgebra::{Vec3, zero};
 
-pub type RegisterExtern = extern "stdcall" fn(Vec3<f32>, i32, VoxelData) -> u32;
-pub type DeregisterExtern = extern "stdcall" fn(u32);
-
 // FFI INTERFACE
 #[no_mangle]
 pub extern "stdcall" fn svo_create(voxel_type: i32,
