@@ -24,43 +24,41 @@ pub trait ReadSVO: Read {
         let mut stack: Vec<SVO> = vec![];
 
         let mut b = [0];
-        while try!{ self.read(&mut b) } > 0 { match b[0] {
+        let bytes_read = try!{ self.read(&mut b) };
+        if bytes_read == 0 {
+            let msg = "Unexpected end of input stream.";
+            return Err(Error::new(ErrorKind::InvalidData, msg));
+        }
+
+        match b[0] {
             VOXEL_TAG => {
                 let data = try!{ self.read_voxel_data() };
-                stack.push(SVO::new_voxel(data, 0));
+                Ok(SVO::new_voxel(data, 0))
             },
             OCTANT_TAG if stack.len() < 8 => {
                 let msg = "Cannot interpret bytes as SVO; found an Octant when there weren't enough children.";
-                return Err(Error::new(ErrorKind::InvalidData, msg));
+                Err(Error::new(ErrorKind::InvalidData, msg))
             },
             OCTANT_TAG => {
                 // TODO: surely there's a better way
-                let octant7 = Box::new(stack.pop().unwrap());
-                let octant6 = Box::new(stack.pop().unwrap());
-                let octant5 = Box::new(stack.pop().unwrap());
-                let octant4 = Box::new(stack.pop().unwrap());
-                let octant3 = Box::new(stack.pop().unwrap());
-                let octant2 = Box::new(stack.pop().unwrap());
-                let octant1 = Box::new(stack.pop().unwrap());
-                let octant0 = Box::new(stack.pop().unwrap());
-
-                stack.push(SVO::Octants([
+                let octant7 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant6 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant5 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant4 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant3 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant2 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant1 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                let octant0 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
+                SVO::Octants([
                     octant0, octant1, octant2, octant3,
                     octant4, octant5, octant6, octant7
-                ]));
+                ])
             },
             other => {
                 let msg = format!("Invalid SVO type specifier '{}' found", other);
-                return Err(Error::new(ErrorKind::InvalidData, msg));
+                Err(Error::new(ErrorKind::InvalidData, msg))
             }
-        }}
-
-        if stack.len() != 1 {
-            let msg = format!("Finished reading the bytes and found {} root SVOs when there should only be one.", stack.len());
-            return Err(Error::new(ErrorKind::InvalidData, msg));
-        };
-        // TODO: register_all the SVO
-        Ok(stack.pop().unwrap())
+        }
     }
 }
 
