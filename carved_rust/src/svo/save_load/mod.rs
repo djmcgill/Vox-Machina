@@ -21,8 +21,6 @@ pub trait ReadSVO: Read {
             registration_fns: &RegistrationFunctions,
             origin: Vec3<f32>,
             depth: i32) -> Result<SVO> {
-        let mut stack: Vec<SVO> = vec![];
-
         let mut b = [0];
         let bytes_read = try!{ self.read(&mut b) };
         if bytes_read == 0 {
@@ -35,10 +33,6 @@ pub trait ReadSVO: Read {
                 let data = try!{ self.read_voxel_data() };
                 Ok(SVO::new_voxel(data, 0))
             },
-            OCTANT_TAG if stack.len() < 8 => {
-                let msg = "Cannot interpret bytes as SVO; found an Octant when there weren't enough children.";
-                Err(Error::new(ErrorKind::InvalidData, msg))
-            },
             OCTANT_TAG => {
                 // TODO: surely there's a better way
                 let octant7 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
@@ -49,10 +43,10 @@ pub trait ReadSVO: Read {
                 let octant2 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
                 let octant1 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
                 let octant0 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                SVO::Octants([
+                Ok(SVO::Octants([
                     octant0, octant1, octant2, octant3,
                     octant4, octant5, octant6, octant7
-                ])
+                ]))
             },
             other => {
                 let msg = format!("Invalid SVO type specifier '{}' found", other);
