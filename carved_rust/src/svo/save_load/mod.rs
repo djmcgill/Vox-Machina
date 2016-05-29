@@ -2,6 +2,10 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use nalgebra::{Vec3, zero};
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use svo::*;
+use std::mem;
+
+#[cfg(test)]
+mod test;
 
 const VOXEL_TAG: u8 = 1;
 const OCTANT_TAG: u8 = 2;
@@ -31,22 +35,22 @@ pub trait ReadSVO: Read {
         match b[0] {
             VOXEL_TAG => {
                 let data = try!{ self.read_voxel_data() };
-                Ok(SVO::new_voxel(data, 0))
+                // let data = VoxelData::new(1);
+                let external_id = (registration_fns.register)(origin, depth, data);
+                Ok(SVO::new_voxel(data, external_id))
             },
             OCTANT_TAG => {
-                // TODO: surely there's a better way
-                let octant7 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant6 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant5 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant4 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant3 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant2 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant1 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                let octant0 = Box::new( try!{ self.read_svo_from(registration_fns, origin, depth) });
-                Ok(SVO::Octants([
-                    octant0, octant1, octant2, octant3,
-                    octant4, octant5, octant6, octant7
-                ]))
+                // TODO: use mem::uninitialized here
+                let mut octants: [Box<SVO>; 8] =
+                    [Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)),
+                     Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0))];
+
+                for ix in 0..8 {
+                    let ix_origin = origin + offset(ix, depth);
+                    let result: SVO = try!{ self.read_svo_from(registration_fns, ix_origin, depth+1) };
+                    mem::replace(&mut octants[ix as usize], Box::new(result));
+                }
+                Ok(SVO::Octants(octants))
             },
             other => {
                 let msg = format!("Invalid SVO type specifier '{}' found", other);
@@ -63,9 +67,6 @@ pub trait WriteSVO: Write {
         self.write_i32::<LittleEndian>(voxel.voxel_type)
     }
 
-    /// The data is encoded like a stack. Each set of bytes is tagged with VOXEL_TAG or OCTANT_TAG.
-    /// If you find a VOXEL_TAG, then read a VoxelData and add this voxel to the stack.
-    /// If you find a OCTANT_TAG, then pop previous 8 SVOs (which may or may not be Voxels) and add an Octant.
     fn write_svo(&mut self, svo: &SVO) -> Result<()> {
         match *svo {
             SVO::Voxel { data, .. } => {
@@ -74,8 +75,8 @@ pub trait WriteSVO: Write {
                 Ok(())
             },
             SVO::Octants (ref octants) => {
+                try! { self.write(&[OCTANT_TAG]) }; // Tag the next 8 SVOs as a voxel
                 for octant in octants { try! { self.write_svo(octant) }; }
-                try! { self.write(&[OCTANT_TAG]) }; // Tag the previous 8 SVOs as a voxel
                 Ok(())
             }
         }

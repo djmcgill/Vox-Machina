@@ -3,83 +3,32 @@ pub mod voxel_data;
 
 mod set_block;
 mod cast_ray;
+mod save_load;
 
 #[cfg(test)]
-mod svo_tests;
+mod test;
 
-use nalgebra::{Vec3, zero};
+use nalgebra::Vec3;
 pub use self::registration::*;
 pub use self::voxel_data::VoxelData;
-use std::mem;
 
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 #[derive(Debug, PartialEq)]
-pub enum SVO<R: RegistrationState> {
-    Voxel { data: VoxelData, registration: R },
+pub enum SVO {
+    Voxel { data: VoxelData, external_id: u32 },
 
     // For a given point (x, y, z), the index of its octant is
     // ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
-    Octants ([Box<SVO<R>>; 8])
+    Octants ([Box<SVO>; 8])
 }
 
-impl SVO<Unregistered> {
-    pub fn new_voxel(voxel_data: VoxelData) -> SVO<Unregistered> {
-        SVO::Voxel { data: voxel_data, registration: Unregistered::new() }
+impl SVO {
+    pub fn new_voxel(voxel_data: VoxelData, external_id: u32) -> SVO {
+        SVO::Voxel { data: voxel_data, external_id: external_id }
     }
 
-    pub fn register_origin(mut self, registration_fns: &RegistrationFunctions) -> SVO<Registered> {
-        self.register_from(registration_fns, zero(), 0)
-    }
-
-    pub fn register_from(
-            mut self,
-            registration_fns: &RegistrationFunctions,
-            origin: Vec3<f32>,
-            depth: i32
-        ) -> SVO<Registered> {
-
-        self.register_helper(registration_fns, origin, depth);
-        unsafe { mem::transmute(self) }
-    }
-
-    fn register_helper(
-            &mut self,
-            registration_fns: &RegistrationFunctions,
-            origin: Vec3<f32>,
-            depth: i32) {
-        match *self {
-            SVO::Octants (ref mut octants) => for ix in 0..8 {
-                let new_origin = origin + offset(ix, depth);
-                octants[ix as usize].register_helper(registration_fns, new_origin, depth+1);
-            },
-            SVO::Voxel { data, .. } => {
-                let registration: Unregistered = unsafe {
-                    mem::transmute((registration_fns.register)(origin, depth, data))
-                };
-                *self = SVO::Voxel { data: data, registration: registration };
-            }
-        }
-    }
-}
-
-impl SVO<Registered> {
-    fn deregister_helper(&self, registration_fns: &RegistrationFunctions) {
-        match *self {
-            SVO::Voxel { registration, .. } =>
-                (registration_fns.deregister)(registration),
-            SVO::Octants (ref octants) =>
-                for octant in octants { octant.deregister_helper(registration_fns); }
-        }
-    }
-
-    fn deregister(self, registration_fns: &RegistrationFunctions) -> SVO<Unregistered> {
-        self.deregister_helper(registration_fns);
-        unsafe { mem::transmute(self) }
-    }
-}
-
-impl<R: RegistrationState> SVO<R> {
-    pub fn new_octants<F: FnMut(u8) -> SVO<R>>(mut make_octant: F) -> SVO<R> {
+    // TODO: why is this FnMut?
+    pub fn new_octants<F: FnMut(u8) -> SVO>(mut make_octant: F) -> SVO {
         SVO::Octants([
             Box::new(make_octant(0)), Box::new(make_octant(1)),
             Box::new(make_octant(2)), Box::new(make_octant(3)),
@@ -96,17 +45,26 @@ impl<R: RegistrationState> SVO<R> {
     }
 
     // If the SVO is Octants, return its contents.
-    fn get_octants(&self) -> Option<&[Box<SVO<R>>; 8]> {
+    fn get_octants(&self) -> Option<&[Box<SVO>; 8]> {
         match *self {
             SVO::Octants(ref octants) => Some(octants),
             _ => None
         }
     }
 
-    fn get_mut_octants(&mut self) -> Option<&mut [Box<SVO<R>>; 8]> {
+    fn get_mut_octants(&mut self) -> Option<&mut [Box<SVO>; 8]> {
         match *self {
             SVO::Octants(ref mut octants) => Some(octants),
             _ => None
+        }
+    }
+
+    fn deregister(&mut self, registration_fns: &RegistrationFunctions) {
+        match *self {
+            SVO::Voxel { external_id, .. } =>
+                (registration_fns.deregister)(external_id),
+            SVO::Octants (ref mut octants) =>
+                for octant in octants { octant.deregister(registration_fns); }
         }
     }
 }

@@ -6,16 +6,17 @@ use nalgebra::{Vec3, zero};
 
 // FFI INTERFACE
 #[no_mangle]
-pub extern "stdcall" fn svo_create(voxel_type: i32,
-                                   register_extern: RegisterExtern,
-                                   deregister_extern: DeregisterExtern) -> *mut ExternalSVO {
+pub extern "stdcall" fn svo_create(
+        voxel_type: i32,
+        register_extern: RegisterExtern,
+        deregister_extern: DeregisterExtern) -> *mut ExternalSVO<'static> {
 
     let voxel_data = VoxelData::new(voxel_type);
-    let uid = register_extern(zero(), 0, voxel_data);
+    let registration_fns = RegistrationFunctions::external(register_extern, deregister_extern);
+    let svo = SVO::new_voxel(voxel_data).register_origin(&registration_fns);
     let external_svo = ExternalSVO {
-        register_extern: register_extern,
-        deregister_extern: deregister_extern,
-        svo: SVO::new_voxel(voxel_data, uid)
+        registration_fns: registration_fns,
+        svo: svo
     };
     unsafe { transmute(Box::new(external_svo)) }
 }
@@ -34,21 +35,18 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const ExternalSVO, ray_origin: Ve
 
 #[no_mangle]
 pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_voxel_type: i32) {
-    let &mut ExternalSVO { ref mut svo, register_extern, deregister_extern } = unsafe { &mut *svo_ptr };
-    let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
-    let voxel_data = VoxelData::new(new_voxel_type);
+    let &mut ExternalSVO { registration_fns, svo } = unsafe { &mut *svo_ptr };
+    // let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
+    // let voxel_data = VoxelData::new(new_voxel_type);
 
-    let r = |vec, depth, data| register_extern(vec, depth, data);
-    let d = |id| deregister_extern(id);
-    svo.set_block(r, d, index, voxel_data);
+    // svo.set_block(registration_fns, index, voxel_data);
 }
 
 // UTILS
 #[repr(C)]
-pub struct ExternalSVO {
-    pub register_extern: RegisterExtern,
-    pub deregister_extern: DeregisterExtern,
-    pub svo: SVO
+pub struct ExternalSVO<'a> {
+    pub registration_fns: RegistrationFunctions<'a>,
+    pub svo: SVO<Registered>
 }
 
 #[repr(C)] #[derive(Debug)]
