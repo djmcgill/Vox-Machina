@@ -85,11 +85,11 @@ fn register_blocks() {
     	};
 
     	let mut svo = SVO::new_voxel(VoxelData::new(1)).register_origin(&registration_fns);
-        svo = svo.set_block(&registration_fns, &[2], VoxelData::new(0));
-        svo = svo.set_block(&registration_fns, &[3], VoxelData::new(0));
-        svo = svo.set_block(&registration_fns, &[6], VoxelData::new(0));
-        svo = svo.set_block(&registration_fns, &[7], VoxelData::new(0));
-        svo = svo.set_block(&registration_fns, &[1, 3], VoxelData::new(2));
+        svo.set_block(&registration_fns, &[2], VoxelData::new(0));
+        svo.set_block(&registration_fns, &[3], VoxelData::new(0));
+        svo.set_block(&registration_fns, &[6], VoxelData::new(0));
+        svo.set_block(&registration_fns, &[7], VoxelData::new(0));
+        svo.set_block(&registration_fns, &[1, 3], VoxelData::new(2));
         svo
     };
     let deregistered_vec = deregistered_vec.into_inner();
