@@ -4,6 +4,7 @@ pub mod voxel_data;
 mod set_block;
 mod cast_ray;
 mod save_load;
+mod generator;
 
 #[cfg(test)]
 mod test;

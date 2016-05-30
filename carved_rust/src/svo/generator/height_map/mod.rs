@@ -1,10 +1,11 @@
 /// Given a square heightmap image and a depth, turn it into a SVO
 
 use svo::*;
-
 use std::u8;
-
 use nalgebra::zero;
+
+#[cfg(test)]
+mod test;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 struct SubImage<'a> {
@@ -88,18 +89,18 @@ impl<'a> SubImage<'a> {
 }
 
 impl SVO {
-	pub fn height_map(depth: u32, image: &[u8], width: u32, height: u32) -> SVO {
+	pub fn height_map(depth: u32, image: &[u8], width: u32, height: u32, registration_fns: &RegistrationFunctions) -> SVO {
 		assert_eq!(image.len(), (width * height) as usize);
-		SVO::height_map_sub(depth, SubImage::new(image, width, height))
+		SVO::height_map_sub(depth, SubImage::new(image, width, height), registration_fns)
 	}
 
-	fn height_map_sub(depth: u32, image: SubImage) -> SVO {
+	fn height_map_sub(depth: u32, image: SubImage, registration_fns: &RegistrationFunctions) -> SVO {
 		match image.octs() {
 			Some(sub_images) if depth > 0 => { // Recurse
 				let mut svo = SVO::new_octants(|ix| {
-					SVO::height_map_sub(depth-1, sub_images[ix as usize])
+					SVO::height_map_sub(depth-1, sub_images[ix as usize], registration_fns)
 				});
-				svo.recombine_svo(&|_, _, _| 0, &|_| {}, zero(), 0);
+				svo.recombine_svo(registration_fns, zero(), 0);
 				svo
 			},
 
