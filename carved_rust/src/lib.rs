@@ -9,8 +9,8 @@ macro_rules! get(
 );
 
 macro_rules! guard(
-	($e:expr) => (if $e { () } else { return None })
+	($e:expr) => (if !$e { return None })
 );
 
 mod svo;
-// pub mod carved_rust;
+pub mod ffi;

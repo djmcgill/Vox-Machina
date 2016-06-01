@@ -4,6 +4,9 @@ use std::mem::transmute;
 use std::slice;
 use nalgebra::{Vec3, zero};
 
+#[cfg(test)]
+mod test;
+
 // FFI INTERFACE
 #[no_mangle]
 pub extern "stdcall" fn svo_create(
@@ -13,7 +16,8 @@ pub extern "stdcall" fn svo_create(
 
     let voxel_data = VoxelData::new(voxel_type);
     let registration_fns = RegistrationFunctions::external(register_extern, deregister_extern);
-    let svo = SVO::new_voxel(voxel_data).register_origin(&registration_fns);
+    let external_id = (registration_fns.register)(zero(), 0, voxel_data);
+    let svo = SVO::new_voxel(voxel_data, external_id);
     let external_svo = ExternalSVO {
         registration_fns: registration_fns,
         svo: svo
@@ -35,18 +39,18 @@ pub extern "stdcall" fn svo_cast_ray(svo_ptr: *const ExternalSVO, ray_origin: Ve
 
 #[no_mangle]
 pub extern "stdcall" fn svo_set_block(svo_ptr: *mut ExternalSVO, index_ptr: *const u8, index_len: usize, new_voxel_type: i32) {
-    let &mut ExternalSVO { registration_fns, svo } = unsafe { &mut *svo_ptr };
-    // let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
-    // let voxel_data = VoxelData::new(new_voxel_type);
+    let svo_ref: &mut ExternalSVO = unsafe { &mut *svo_ptr };
+    let index: &[u8] = unsafe { slice::from_raw_parts(index_ptr, index_len) };
+    let voxel_data = VoxelData::new(new_voxel_type);
 
-    // svo.set_block(registration_fns, index, voxel_data);
+    svo_ref.svo.set_block(&svo_ref.registration_fns, index, voxel_data);
 }
 
 // UTILS
 #[repr(C)]
 pub struct ExternalSVO<'a> {
     pub registration_fns: RegistrationFunctions<'a>,
-    pub svo: SVO<Registered>
+    pub svo: SVO
 }
 
 #[repr(C)] #[derive(Debug)]
