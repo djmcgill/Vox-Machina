@@ -27,12 +27,14 @@ public class SVOController : MonoBehaviour
 			{
 				lock(thisLock)
 				{
-					var obj = (Transform)Instantiate(test, vec, Quaternion.identity);
 					float scale = (float) Math.Pow(2, -depth);
+					var adjustedVec = vec + new Vector3(scale/2, scale/2, scale/2);
+					var obj = (Transform)Instantiate(test, adjustedVec, Quaternion.identity);
+
 					obj.localScale = new Vector3(scale, scale, scale);
 					var uid = VOXEL_ID++;
 					drawnVoxels.Add(uid, obj);
-					print(String.Format("Creating {5} Vec: ( {0}, {1}, {2} ) depth: {3} type: {4}", vec.x, vec.y, vec.z, depth, voxelType, uid));
+					print(String.Format("Creating {5} Vec: ( {0}, {1}, {2} ) depth: {3} type: {4}", adjustedVec.x, adjustedVec.y, adjustedVec.z, depth, voxelType, uid));
 					return uid;
 				}
 			}
