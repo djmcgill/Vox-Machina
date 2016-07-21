@@ -75,6 +75,13 @@ public class SVOController : MonoBehaviour
 		{
 			var hitPos = maybeHitPos.Value;
 			print (String.Format ("Ray hit at: ({0}, {1}, {2})", hitPos.x, hitPos.y, hitPos.z));
+
+			if (Input.GetKeyDown (KeyCode.Q))
+			{
+				byte[] index = { };
+				svo.SetBlock(index, 0);
+			}
+				
 		}
 			
 	}

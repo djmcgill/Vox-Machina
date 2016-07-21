@@ -9,7 +9,6 @@ nalgebra = "0.5.1"
 
 [dev-dependencies]
 quickcheck = "0.2"
-quickcheck_macros = "0.2"
 
 [lib]
 name = "carved_rust"

@@ -1,4 +1,4 @@
-//extern crate test;
+use quickcheck::*;
 
 // use carved_rust;
 use nalgebra::{ApproxEq, Vec3, zero};
@@ -7,6 +7,55 @@ use svo::*;
 
 fn register(_: Vec3<f32>, _: i32, _: VoxelData) -> u32 { 0 }
 fn deregister(_: u32) {}
+
+// WARNING: Clone is for non-FFI testing purposes only.
+// Cloning a SVO that has been registered externally is BAD.
+impl Clone for SVO {
+    fn clone(&self) -> SVO {
+        match *self {
+            SVO::Voxel { data, external_id } => SVO::new_voxel(data, external_id),
+            SVO::Octants(ref octants) => SVO::new_octants(|ix| *octants[ix as usize].clone())
+        }
+    }
+}
+
+impl Arbitrary for SVO {
+    fn arbitrary<G: Gen>(g: &mut G) -> SVO {
+        fn fixed_size_arbitrary<G: Gen>(g: &mut G, size: usize) -> SVO {
+            match size {
+                0 => {
+                    let data_type = g.gen::<bool>() as i32;
+                    SVO::new_voxel(VoxelData::new(data_type), Arbitrary::arbitrary(g))
+                },
+                n => {
+                    let new_size = n/8;
+                    SVO::Octants([
+                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
+                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
+                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
+                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size))
+                    ])
+                }
+            }
+        }
+        let height = g.size();
+        fixed_size_arbitrary(g, height)
+    }
+
+    // fn shrink(&self) -> Box<Iterator<Item=SVO>> {
+    //     match *self {
+    //         SVO::Voxel { data, external_id } => {
+    //             Box::new((data, external_id).shrink().map(|(new_data, new_external_id)| SVO::new_voxel(new_data, new_external_id)))
+    //         },
+    //         SVO::Octants(ref octants) => Box::new(vec![
+    //             *octants[0].clone(), *octants[1].clone(),
+    //             *octants[2].clone(), *octants[3].clone(),
+    //             *octants[4].clone(), *octants[5].clone(),
+    //             *octants[6].clone(), *octants[7].clone()
+    //         ].into_iter())
+    //     }
+    // }
+}
 
 #[test]
 fn on_blocks() {
@@ -76,6 +125,15 @@ fn register_blocks() {
         }
     }
     assert_eq!(deregistered_vec, vec![0, 3, 4, 7, 8, 2, 16]);
+}
+
+#[test]
+fn above_axis_index_cancel() {
+    fn check_above_axis_index_cancel(ix: u8) -> TestResult {
+        if ix >= 8 { return TestResult::discard(); }
+        TestResult::from_bool(index(above_axis(ix)) == ix)
+    }
+    quickcheck(check_above_axis_index_cancel as fn(u8) -> TestResult)
 }
 
 impl SVO {

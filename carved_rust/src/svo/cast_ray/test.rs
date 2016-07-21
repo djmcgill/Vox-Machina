@@ -1,5 +1,6 @@
 use svo::*;
 use nalgebra::{ApproxEq, Vec3};
+use quickcheck::*;
 
 #[test]
 fn ray_casting() {
@@ -19,4 +20,14 @@ fn ray_casting() {
 
     let no_hit1 = svo.cast_ray(Vec3::new(2., 0.6, 2.), Vec3::new(-0.006, 0., -0.006));
     assert!(no_hit1.is_none());
+}
+
+#[test]
+fn same_as_old_results() {
+    fn same_as_old_results_inner(svo: SVO, origin_tuple: (f32, f32, f32), dir_tuple: (f32, f32, f32)) -> bool {
+        let origin = Vec3::new(origin_tuple.0.abs(), origin_tuple.1.abs(), origin_tuple.2.abs());
+        let dir = Vec3::new(-dir_tuple.0.abs(), -dir_tuple.1.abs(), -dir_tuple.2.abs());
+        svo.cast_ray(origin, dir) == svo.cast_ray_old(origin, dir)
+    }
+    quickcheck(same_as_old_results_inner as fn(SVO, (f32, f32, f32), (f32, f32, f32)) -> bool)
 }

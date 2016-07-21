@@ -4,6 +4,9 @@
 extern crate nalgebra;
 extern crate byteorder; // could switch to bincode if needed
 
+#[cfg(test)]
+extern crate quickcheck;
+
 macro_rules! get(
     ($e:expr) => (match $e { Some(e) => e, None => return None })
 );
