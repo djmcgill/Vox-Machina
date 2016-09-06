@@ -2,7 +2,6 @@
 
 use svo::*;
 use std::u8;
-use nalgebra::zero;
 
 #[cfg(test)]
 mod test;
@@ -89,25 +88,25 @@ impl<'a> SubImage<'a> {
 }
 
 impl SVO {
-	pub fn height_map(depth: u32, image: &[u8], width: u32, height: u32, registration_fns: &RegistrationFunctions) -> SVO {
+	pub fn height_map(depth: u32, image: &[u8], width: u32, height: u32) -> SVO {
 		assert_eq!(image.len(), (width * height) as usize);
-		SVO::height_map_sub(depth, SubImage::new(image, width, height), registration_fns)
+		SVO::height_map_sub(depth, SubImage::new(image, width, height))
 	}
 
-	fn height_map_sub(depth: u32, image: SubImage, registration_fns: &RegistrationFunctions) -> SVO {
+	fn height_map_sub(depth: u32, image: SubImage) -> SVO {
 		match image.octs() {
 			Some(sub_images) if depth > 0 => { // Recurse
 				let mut svo = SVO::new_octants(|ix| {
-					SVO::height_map_sub(depth-1, sub_images[ix as usize], registration_fns)
+					SVO::height_map_sub(depth-1, sub_images[ix as usize])
 				});
-				svo.recombine_svo(registration_fns, zero(), 0);
+				svo.recombine_svo();
 				svo
 			},
 
 			_ => { // Make a voxel here
 				let threshold = image.b_0 + (image.b_n - image.b_0) / 2;
 				let voxel_type = if image.byte_avg() <= threshold { 0 } else { 1 };
-				SVO::new_voxel(VoxelData::new(voxel_type), 0)
+				SVO::new_voxel(VoxelData::new(voxel_type))
 			}
 		}
 	}

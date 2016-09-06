@@ -16,7 +16,7 @@ pub use self::voxel_data::VoxelData;
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 #[derive(Debug, PartialEq)]
 pub enum SVO {
-    Voxel { data: VoxelData, external_id: u32 },
+    Voxel { data: VoxelData },
 
     // For a given point (x, y, z), the index of its octant is
     // ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
@@ -24,8 +24,8 @@ pub enum SVO {
 }
 
 impl SVO {
-    pub fn new_voxel(voxel_data: VoxelData, external_id: u32) -> SVO {
-        SVO::Voxel { data: voxel_data, external_id: external_id }
+    pub fn new_voxel(voxel_data: VoxelData) -> SVO {
+        SVO::Voxel { data: voxel_data }
     }
 
     pub fn new_octants<F: Fn(u8) -> SVO>(make_octant: F) -> SVO {
@@ -56,15 +56,6 @@ impl SVO {
         match *self {
             SVO::Octants(ref mut octants) => Some(octants),
             _ => None
-        }
-    }
-
-    fn deregister(&mut self, registration_fns: &RegistrationFunctions) {
-        match *self {
-            SVO::Voxel { external_id, .. } =>
-                (registration_fns.deregister)(external_id),
-            SVO::Octants (ref mut octants) =>
-                for octant in octants { octant.deregister(registration_fns); }
         }
     }
 }

@@ -1,5 +1,4 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use nalgebra::{Vec3, zero};
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use svo::*;
 use std::mem;
@@ -16,15 +15,11 @@ pub trait ReadSVO: Read {
         Ok(VoxelData::new(voxel_type))
     }
 
-    fn read_svo(&mut self, registration_fns: &RegistrationFunctions) -> Result<SVO> {
-        self.read_svo_from(registration_fns, zero(), 0)
+    fn read_svo(&mut self) -> Result<SVO> {
+        self.read_svo_from()
     }
 
-    fn read_svo_from(
-            &mut self,
-            registration_fns: &RegistrationFunctions,
-            origin: Vec3<f32>,
-            depth: i32) -> Result<SVO> {
+    fn read_svo_from(&mut self) -> Result<SVO> {
         let mut b = [0];
         let bytes_read = try!{ self.read(&mut b) };
         if bytes_read == 0 {
@@ -36,18 +31,16 @@ pub trait ReadSVO: Read {
             VOXEL_TAG => {
                 let data = try!{ self.read_voxel_data() };
                 // let data = VoxelData::new(1);
-                let external_id = (registration_fns.register)(origin, depth, data);
-                Ok(SVO::new_voxel(data, external_id))
+                Ok(SVO::new_voxel(data))
             },
             OCTANT_TAG => {
                 // TODO: use mem::uninitialized here
                 let mut octants: [Box<SVO>; 8] =
-                    [Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)),
-                     Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0)), Box::new(SVO::new_voxel(VoxelData::new(1), 0))];
+                    [Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+                     Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1)))];
 
                 for ix in 0..8 {
-                    let ix_origin = origin + offset(ix, depth);
-                    let result: SVO = try!{ self.read_svo_from(registration_fns, ix_origin, depth+1) };
+                    let result: SVO = try!{ self.read_svo_from() };
                     mem::replace(&mut octants[ix as usize], Box::new(result));
                 }
                 Ok(SVO::Octants(octants))

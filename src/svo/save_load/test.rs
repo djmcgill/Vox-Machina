@@ -5,9 +5,8 @@ use std::io::Cursor;
 fn save_load() {
     use svo::save_load::{ReadSVO, WriteSVO}; // Why isn't this reexported with 'pub mod save_load;'?
     let mut svo = SVO::floor();
-    let registration_fns = &RegistrationFunctions::dummy();
 
-    svo.set_block(registration_fns, &[1, 3], VoxelData::new(2));
+    svo.set_block(&[1, 3], VoxelData::new(2));
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),
@@ -36,7 +35,7 @@ fn save_load() {
 
     println!("==== LOADING ====");
     let reader = &mut Cursor::new(bytes);
-    let new_svo = reader.read_svo(registration_fns).unwrap();
+    let new_svo = reader.read_svo().unwrap();
     new_svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
             (0.5 , 0.  , 0.  , 2, 1),

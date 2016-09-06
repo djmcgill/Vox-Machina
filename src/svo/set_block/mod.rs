@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod test;
 
-use nalgebra::{Vec3, zero};
 use svo::*;
 
 impl SVO {
@@ -9,20 +8,16 @@ impl SVO {
     // Then go back up the tree, recombining if we've transformed all the octants in a node to the same voxel.
     pub fn set_block(
             &mut self,
-            registration_fns: &RegistrationFunctions,
             index: &[u8],
             new_data: VoxelData) {
 
-        self.set_voxel_from(registration_fns, index, &new_data, zero(), 0);
+        self.set_voxel_from(index, &new_data);
     }
 
     fn set_voxel_from(
             &mut self,
-            registration_fns: &RegistrationFunctions,
             index: &[u8],
-            new_data: &VoxelData,
-            origin: Vec3<f32>,
-            depth: i32) {
+            new_data: &VoxelData) {
 
         if let Some(voxel_data) = self.get_voxel_data() {
             if voxel_data == *new_data {return;} // nothing to do
@@ -30,57 +25,35 @@ impl SVO {
 
         match index.split_first() {
             // Overwrite whatever's here with the new voxel.
-            None => {
-                self.deregister(registration_fns);
-                let external_id = (registration_fns.register)(origin, depth, *new_data);
-                *self = SVO::new_voxel(*new_data, external_id);
-            },
+            None => *self = SVO::new_voxel(*new_data),
 
             // We need to go deeper.
             Some((&ix, rest)) => {
                 // Voxels get split up
                 if self.get_voxel_data().is_some() {
-                    self.subdivide_voxel(registration_fns, origin, depth);
+                    self.subdivide_voxel();
                 }
 
                 // Insert destructively into the sub_octant
                 if let SVO::Octants(ref mut octants) = *self {
-                    let new_origin = origin + offset(ix, depth);
-                    octants[ix as usize].set_voxel_from(registration_fns, rest, new_data, new_origin, depth+1);
+                    octants[ix as usize].set_voxel_from(rest, new_data);
                 };
 
-                self.recombine_svo(registration_fns, origin, depth);
+                self.recombine_svo();
             }
         }
     }
 
-    fn subdivide_voxel(
-            &mut self,
-            registration_fns: &RegistrationFunctions,
-            origin: Vec3<f32>,
-            depth: i32) {
+    fn subdivide_voxel(&mut self) {
         *self = match *self {
             SVO::Octants(_) => panic!("subdivide_voxel called on a non-voxel!"),
-            SVO::Voxel { data, external_id } => {
-                (registration_fns.deregister)(external_id);
-                SVO::new_octants(|ix| {
-                    let new_origin = origin + offset(ix, depth);
-                    let new_external_id = (registration_fns.register)(new_origin, depth+1, data);
-                    SVO::new_voxel(data, new_external_id)
-                })
-            }
+            SVO::Voxel { data, .. } => SVO::new_octants(|_| { SVO::new_voxel(data) })
         };
     }
 
-    pub fn recombine_svo(
-            &mut self,
-            registration_fns: &RegistrationFunctions,
-            origin: Vec3<f32>,
-            depth: i32) {
+    pub fn recombine_svo(&mut self) {
     if let Some(combined_voxel_data) = self.get_octants().and_then(combine_voxels) {
-            self.deregister(registration_fns);
-            let external_id = (registration_fns.register)(origin, depth, combined_voxel_data);
-            *self = SVO::new_voxel(combined_voxel_data, external_id);
+            *self = SVO::new_voxel(combined_voxel_data);
         }
     }
 }

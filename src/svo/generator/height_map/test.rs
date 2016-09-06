@@ -7,7 +7,7 @@ fn flat_height_map() {
     let height = 4;
 
     let image: [u8; 16] = [127u8; 16];
-    let svo = SVO::height_map(1, &image, width, height, &RegistrationFunctions::dummy());
+    let svo = SVO::height_map(1, &image, width, height);
     svo.assert_contains(vec![
         (0. , 0. , 0. , 1, 1),
         (0.5, 0. , 0. , 1, 1),
@@ -26,7 +26,7 @@ fn full_height_map() {
     let height = 4;
 
     let image: [u8; 16] = [u8::MAX; 16];
-    let svo = SVO::height_map(1, &image, width, height, &RegistrationFunctions::dummy());
+    let svo = SVO::height_map(1, &image, width, height);
     svo.assert_contains(vec![(0., 0., 0., 0, 1)]);
 }
 
@@ -36,6 +36,6 @@ fn empty_height_map() {
     let height = 4;
 
     let image: [u8; 16] = [0u8; 16];
-    let svo = SVO::height_map(1, &image, width, height, &RegistrationFunctions::dummy());
+    let svo = SVO::height_map(1, &image, width, height);
     svo.assert_contains(vec![(0., 0., 0., 0, 0)]);
 }

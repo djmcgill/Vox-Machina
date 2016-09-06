@@ -17,4 +17,3 @@ macro_rules! guard(
 );
 
 mod svo;
-pub mod ffi;
