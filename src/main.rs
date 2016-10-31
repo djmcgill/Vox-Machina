@@ -1,66 +1,156 @@
+// Copyright 2014 The Gfx-rs Developers.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// Modified by David McGillicuddy
+#![allow(dead_code)]
+
+extern crate cgmath;
 #[macro_use]
 extern crate gfx;
-extern crate gfx_window_glutin;
-extern crate glutin;
+extern crate gfx_app;
+#[macro_use]
+extern crate nalgebra;
+extern crate byteorder;
+#[cfg(test)]
+extern crate quickcheck;
 
-use gfx::traits::FactoryExt;
-use gfx::Device;
+macro_rules! get(
+    ($e:expr) => (match $e { Some(e) => e, None => return None })
+);
 
-pub type ColorFormat = gfx::format::Rgba8;
-pub type DepthFormat = gfx::format::DepthStencil;
+macro_rules! guard(
+	($e:expr) => (if !$e { return None })
+);
 
-const TRIANGLE: [Vertex; 3] = [
-    Vertex { pos: [ -0.5, -0.5 ], color: [1.0, 0.0, 0.0] },
-    Vertex { pos: [  0.5, -0.5 ], color: [0.0, 1.0, 0.0] },
-    Vertex { pos: [  0.0,  0.5 ], color: [0.0, 0.0, 1.0] }
-];
-const CLEAR_COLOR: [f32; 4] = [0.1, 0.2, 0.3, 1.0];
+mod svo;
+mod graphics;
 
-gfx_defines!{
-    vertex Vertex {
-        pos: [f32; 2] = "a_Pos",
-        color: [f32; 3] = "a_Color",
+use gfx::{Bundle, texture};
+use svo::{SVO, VoxelData};
+use graphics::*;
+
+struct App<R: gfx::Resources>{
+    bundle: Bundle<R, pipe::Data<R>>,
+    mapping: gfx::mapping::RWable<R, Instance>,
+    svo: SVO
+}
+
+fn fill_instances(instances: &mut [Instance], instances_per_length: u32, size: f32) {
+    let length = instances_per_length as usize;
+    for i in 0..instances_per_length as usize {
+        instances[i] = Instance {
+            translate: [0f32, 0.0, 0.0],
+        };
+    }
+}
+fn update_instances(instances: &mut [Instance]) {}
+const MAX_INSTANCE_COUNT: usize = 2048;
+
+impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
+    fn new<F: gfx::Factory<R>>(mut factory: F, init: gfx_app::Init<R>) -> Self {
+        use cgmath::{Point3, Vector3};
+        use cgmath::{Transform, AffineMatrix3};
+        use gfx::traits::FactoryExt;
+
+        let vs = gfx_app::shade::Source {
+            // glsl_120: include_bytes!("shader/cube_120.glslv"),
+            glsl_150: include_bytes!("shader/cube_150.glslv"),
+            // glsl_es_100: include_bytes!("shader/cube_100_es.glslv"),
+            // hlsl_40: include_bytes!("data/vertex.fx"),
+            // msl_11: include_bytes!("shader/cube_vertex.metal"),
+            // vulkan:  include_bytes!("data/vert.spv"),
+            .. gfx_app::shade::Source::empty()
+        };
+        let ps = gfx_app::shade::Source {
+            // glsl_120: include_bytes!("shader/cube_120.glslf"),
+            glsl_150: include_bytes!("shader/cube_150.glslf"),
+            // glsl_es_100: include_bytes!("shader/cube_100_es.glslf"),
+            // hlsl_40: include_bytes!("data/pixel.fx"),
+            // msl_11: include_bytes!("shader/cube_frag.metal"),
+            // vulkan:  include_bytes!("data/frag.spv"),
+            .. gfx_app::shade::Source::empty()
+        };
+
+        let instance_count = 1u32;
+        assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
+        let svo = SVO::new_voxel(VoxelData::new(1));
+
+        let (instance_buffer, mut instance_mapping) = factory
+            .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
+                                         gfx::buffer::Role::Vertex,
+                                         gfx::Bind::empty());
+        {
+            let mut instances = instance_mapping.read_write();
+            fill_instances(&mut instances, instance_count, 0f32);
+        }
+
+        let (verts, indices) = svo.vertex_data();
+        let (quad_vertices, mut slice) = factory
+            .create_vertex_buffer_with_slice(&verts, &indices[..]);
+        slice.instances = Some((instance_count, 0));
+
+        let texels = [[0x20, 0xA0, 0xC0, 0x00]];
+        let (_, texture_view) = factory.create_texture_immutable::<gfx::format::Rgba8>(
+            texture::Kind::D2(1, 1, texture::AaMode::Single), &[&texels]
+            ).unwrap();
+
+        let sinfo = texture::SamplerInfo::new(
+            texture::FilterMethod::Bilinear,
+            texture::WrapMode::Clamp);
+
+        let pso = factory.create_pipeline_simple(
+            vs.select(init.backend).unwrap(),
+            ps.select(init.backend).unwrap(),
+            pipe::new()
+        ).unwrap();
+
+        let view: AffineMatrix3<f32> = Transform::look_at(
+            Point3::new(1.5f32, -5.0, 3.0),
+            Point3::new(0f32, 0.0, 0.0),
+            Vector3::unit_z(),
+        );
+        let proj = cgmath::perspective(cgmath::deg(45.0f32), init.aspect_ratio, 1.0, 10.0);
+
+        let data = pipe::Data {
+            vbuf: quad_vertices,
+            instance: instance_buffer,
+            transform: (proj * view.mat).into(),
+            locals: factory.create_constant_buffer(1),
+            color: (texture_view, factory.create_sampler(sinfo)),
+            out_color: init.color,
+            out_depth: init.depth,
+        };
+
+        App {
+            bundle: Bundle::new(slice, pso, data),
+            mapping: instance_mapping,
+            svo: svo,
+        }
     }
 
-    pipeline pipe {
-        vbuf: gfx::VertexBuffer<Vertex> = (),
-        out: gfx::RenderTarget<ColorFormat> = "Target0",
+    fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
+        let mut instances = self.mapping.read_write();
+        update_instances(&mut instances);
+        let locals = Locals { transform: self.bundle.data.transform };
+        encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
+        encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
+        encoder.clear_depth(&self.bundle.data.out_depth, 1.0);
+        encoder.draw(&self.bundle.slice, &self.bundle.pso, &self.bundle.data);
+        self.bundle.encode(encoder);
     }
 }
 
-fn main() {
-    let builder = glutin::WindowBuilder::new()
-        .with_title("Vox Machina".to_string())
-        .with_dimensions(1024, 768)
-        .with_vsync();
-    let (window, mut device, mut factory, main_color, _main_depth) =
-        gfx_window_glutin::init::<ColorFormat, DepthFormat>(builder);
-    let mut encoder: gfx::Encoder<_, _> = factory.create_command_buffer().into();
-    let pso = factory.create_pipeline_simple(
-        include_bytes!("shader/triangle_150.glslv"),
-        include_bytes!("shader/triangle_150.glslf"),
-        pipe::new()
-    ).unwrap();
-    let (vertex_buffer, slice) = factory.create_vertex_buffer_with_slice(&TRIANGLE, ());
-    let data = pipe::Data {
-        vbuf: vertex_buffer,
-        out: main_color
-    };
-
-    'main: loop {
-        // loop over events
-        for event in window.poll_events() {
-            match event {
-                glutin::Event::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) |
-                glutin::Event::Closed => break 'main,
-                _ => {},
-            }
-        }
-        // draw a frame
-        encoder.clear(&data.out, CLEAR_COLOR);
-        encoder.draw(&slice, &pso, &data);
-        encoder.flush(&mut device);
-        window.swap_buffers().unwrap();
-        device.cleanup();
-    }
+pub fn main() {
+    use gfx_app::Application;
+    App::launch_default("Cube example");
 }

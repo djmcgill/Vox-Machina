@@ -6,9 +6,23 @@ authors = ["David McGillicuddy <contact@djmcgill.co.uk>"]
 [dependencies]
 byteorder = "0.5.0"
 nalgebra = "0.5.1"
-gfx = "*"
 glutin = "*"
-gfx_window_glutin = "*"
+cgmath = "0.7"
+
+[dependencies.gfx]
+git = "https://github.com/gfx-rs/gfx.git"
+
+[dependencies.gfx_core]
+git = "https://github.com/gfx-rs/gfx.git"
+
+[dependencies.gfx_window_glutin]
+git = "https://github.com/gfx-rs/gfx.git"
+
+[dependencies.gfx_device_gl]
+git = "https://github.com/gfx-rs/gfx.git"
+
+[dependencies.gfx_app]
+git = "https://github.com/gfx-rs/gfx.git"
 
 [dev-dependencies]
 quickcheck = "0.2"
