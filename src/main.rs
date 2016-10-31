@@ -49,7 +49,7 @@ fn fill_instances(instances: &mut [Instance], instances_per_length: u32, size: f
     let length = instances_per_length as usize;
     for i in 0..instances_per_length as usize {
         instances[i] = Instance {
-            translate: [0f32, 0.0, 0.0],
+            translate: [2.5 * i as f32, 0.0, 0.0],
         };
     }
 }
@@ -81,7 +81,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .. gfx_app::shade::Source::empty()
         };
 
-        let instance_count = 1u32;
+        let instance_count = 2u32;
         assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
         let svo = SVO::new_voxel(VoxelData::new(1));
 
@@ -94,9 +94,8 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             fill_instances(&mut instances, instance_count, 0f32);
         }
 
-        let (verts, indices) = svo.vertex_data();
         let (quad_vertices, mut slice) = factory
-            .create_vertex_buffer_with_slice(&verts, &indices[..]);
+            .create_vertex_buffer_with_slice(&svo_graphics::CUBE_VERTS, &svo_graphics::CUBE_INDICES[..]);
         slice.instances = Some((instance_count, 0));
 
         let texels = [[0x20, 0xA0, 0xC0, 0x00]];
