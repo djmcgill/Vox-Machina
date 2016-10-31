@@ -1,4 +1,3 @@
-use svo::SVO;
 use graphics::Vertex;
 
 macro_rules! vert (($p:expr, $t:expr) => (

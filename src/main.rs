@@ -49,7 +49,8 @@ fn fill_instances(instances: &mut [Instance], instances_per_length: u32, size: f
     let length = instances_per_length as usize;
     for i in 0..instances_per_length as usize {
         instances[i] = Instance {
-            translate: [2.5 * i as f32, 0.0, 0.0],
+            translate: [2.0 * i as f32, 0.0, 0.0],
+            scale: 1.0 / (i+1) as f32,
         };
     }
 }
@@ -81,7 +82,7 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .. gfx_app::shade::Source::empty()
         };
 
-        let instance_count = 2u32;
+        let instance_count = 3u32;
         assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
         let svo = SVO::new_voxel(VoxelData::new(1));
 
