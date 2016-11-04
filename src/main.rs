@@ -45,16 +45,7 @@ struct App<R: gfx::Resources>{
     svo: SVO
 }
 
-fn fill_instances(instances: &mut [Instance], instances_per_length: u32, size: f32) {
-    let length = instances_per_length as usize;
-    for i in 0..instances_per_length as usize {
-        instances[i] = Instance {
-            translate: [2.0 * i as f32, 0.0, 0.0],
-            scale: 1.0 / (i+1) as f32,
-        };
-    }
-}
-fn update_instances(instances: &mut [Instance]) {}
+fn update_instances(instances: &mut [Instance]) {} // TODO
 const MAX_INSTANCE_COUNT: usize = 2048;
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {

@@ -1,4 +1,4 @@
-use graphics::{Instance, Vertex};
+use graphics::Instance;
 use svo::{SVO, VoxelData};
 
 impl Instance {
