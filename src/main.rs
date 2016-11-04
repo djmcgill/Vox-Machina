@@ -82,18 +82,17 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .. gfx_app::shade::Source::empty()
         };
 
-        let instance_count = 3u32;
-        assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
         let svo = SVO::new_voxel(VoxelData::new(1));
 
         let (instance_buffer, mut instance_mapping) = factory
             .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
                                          gfx::buffer::Role::Vertex,
                                          gfx::Bind::empty());
-        {
+        let instance_count = {
             let mut instances = instance_mapping.read_write();
-            fill_instances(&mut instances, instance_count, 0f32);
-        }
+            svo.fill_instances(&mut instances)
+        };
+        assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
 
         let (quad_vertices, mut slice) = factory
             .create_vertex_buffer_with_slice(&svo_graphics::CUBE_VERTS, &svo_graphics::CUBE_INDICES[..]);
