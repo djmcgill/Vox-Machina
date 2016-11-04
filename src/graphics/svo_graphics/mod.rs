@@ -18,8 +18,8 @@ impl SVO {
         match self {
             &SVO::Voxel{ data } if data.voxel_type == 0 => {},
             &SVO::Voxel{..} => {
-                *instances_iter.next().unwrap() = Instance {
-                    translate: origin,
+                *instances_iter.next().unwrap() = Instance { // Deliberately panic when the array is not long enough
+                    translate: origin,                       // TODO: dynamically extend the array somehow?
                     scale: side_len,
                 }
             },
