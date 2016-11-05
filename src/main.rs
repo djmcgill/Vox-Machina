@@ -55,21 +55,11 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
         use gfx::traits::FactoryExt;
 
         let vs = gfx_app::shade::Source {
-            // glsl_120: include_bytes!("shader/cube_120.glslv"),
             glsl_150: include_bytes!("shader/cube_150.glslv"),
-            // glsl_es_100: include_bytes!("shader/cube_100_es.glslv"),
-            // hlsl_40: include_bytes!("data/vertex.fx"),
-            // msl_11: include_bytes!("shader/cube_vertex.metal"),
-            // vulkan:  include_bytes!("data/vert.spv"),
             .. gfx_app::shade::Source::empty()
         };
         let ps = gfx_app::shade::Source {
-            // glsl_120: include_bytes!("shader/cube_120.glslf"),
             glsl_150: include_bytes!("shader/cube_150.glslf"),
-            // glsl_es_100: include_bytes!("shader/cube_100_es.glslf"),
-            // hlsl_40: include_bytes!("data/pixel.fx"),
-            // msl_11: include_bytes!("shader/cube_frag.metal"),
-            // vulkan:  include_bytes!("data/frag.spv"),
             .. gfx_app::shade::Source::empty()
         };
 
