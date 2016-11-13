@@ -1,8 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use svo::*;
-use std::mem;
-use arrayvec::ArrayVec;
 
 #[cfg(test)]
 mod test;
@@ -17,10 +15,6 @@ pub trait ReadSVO: Read {
     }
 
     fn read_svo(&mut self) -> Result<SVO> {
-        self.read_svo_from()
-    }
-
-    fn read_svo_from(&mut self) -> Result<SVO> {
         let mut b = [0];
         let bytes_read = try!{ self.read(&mut b) };
         if bytes_read == 0 {
@@ -30,23 +24,10 @@ pub trait ReadSVO: Read {
 
         match b[0] {
             VOXEL_TAG => {
-                let data = try!{ self.read_voxel_data() };
-                // let data = VoxelData::new(1);
-                Ok(SVO::new_voxel(data))
+                self.read_voxel_data().map(|data| SVO::new_voxel(data))
             },
             OCTANT_TAG => {
-                // TODO: use mem::uninitialized here
-                let mut octants: ArrayVec<[Box<SVO>; 8]> =
-                    ArrayVec::from (
-                        [Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-                        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1)))
-                    ]);
-
-                for ix in 0..8 {
-                    let result: SVO = try!{ self.read_svo_from() };
-                    mem::replace(&mut octants[ix as usize], Box::new(result));
-                }
-                Ok(SVO::Octants(octants))
+                SVO::new_octants_mut_err(|_| self.read_svo())
             },
             other => {
                 let msg = format!("Invalid SVO type specifier '{}' found", other);
@@ -56,11 +37,10 @@ pub trait ReadSVO: Read {
     }
 }
 
-impl<R: ReadBytesExt> ReadSVO for R {}
-
 pub trait WriteSVO: Write {
     fn write_voxel(&mut self, voxel: VoxelData) -> Result<()> {
-        self.write_i32::<LittleEndian>(voxel.voxel_type)
+        let VoxelData { voxel_type } = voxel;
+        self.write_i32::<LittleEndian>(voxel_type)
     }
 
     fn write_svo(&mut self, svo: &SVO) -> Result<()> {
@@ -78,4 +58,7 @@ pub trait WriteSVO: Write {
         }
     }
 }
+
+// Yes these are weird, but they really need to be here! Things don't implement ReadSVO by default!
+impl<R: ReadBytesExt> ReadSVO for R {}
 impl<W: WriteBytesExt> WriteSVO for W {}

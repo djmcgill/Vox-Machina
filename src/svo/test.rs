@@ -22,12 +22,7 @@ impl Arbitrary for SVO {
                 },
                 n => {
                     let new_size = n/8;
-                    SVO::Octants([
-                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
-                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
-                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size)),
-                        Box::new(fixed_size_arbitrary(g, new_size)), Box::new(fixed_size_arbitrary(g, new_size))
-                    ])
+                    SVO::new_octants_mut(|_| fixed_size_arbitrary(g, new_size))
                 }
             }
         }

@@ -26,12 +26,8 @@ fn voxel_instance() {
 
 #[test]
 fn octants_instance() {
-    let svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
+    let svo = SVO::new_octants(|_| SVO::new_voxel(VoxelData::new(1)));
+
     let mut instances: [Instance; 8] = [
         Instance::zero(), Instance::zero(),
         Instance::zero(), Instance::zero(),
@@ -99,18 +95,13 @@ fn octants_instance() {
 
 #[test]
 fn octants_instance_two_inner() {
-    let sub_svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
-    let svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
+    let svo = SVO::new_octants(|i|
+        if i != 5 {
+            SVO::new_voxel(VoxelData::new(1))
+        } else {
+            SVO::new_octants(|_| SVO::new_voxel(VoxelData::new(1)))
+        }
+    );
 
     let mut instances: [Instance; 24] = [
         Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(),
@@ -180,18 +171,13 @@ fn octants_instance_two_inner() {
 
 #[test]
 fn octants_instance_two_outer() {
-    let sub_svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
-    let svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
+    let svo = SVO::new_octants(|i|
+        if i != 5 {
+            SVO::new_voxel(VoxelData::new(1))
+        } else {
+            SVO::new_octants(|_| SVO::new_voxel(VoxelData::new(1)))
+        }
+    );
 
     let mut instances: [Instance; 24] = [
         Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(), Instance::zero(),
@@ -261,12 +247,11 @@ fn panic_on_overflow() {
 
 #[test]
 fn octants_instance_empty() {
-    let svo = SVO::Octants([
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(0))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(0))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-    ]);
+    let svo = SVO::new_octants(|i| {
+        let data = [1, 0, 1, 0, 1, 1, 1, 1][i as usize];
+        SVO::new_voxel(VoxelData::new(data))
+    });
+
     let mut instances: [Instance; 8] = [
         Instance::zero(), Instance::zero(),
         Instance::zero(), Instance::zero(),

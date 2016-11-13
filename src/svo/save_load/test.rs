@@ -1,9 +1,9 @@
 use svo::*;
+use svo::save_load::{ReadSVO, WriteSVO};
 use std::io::Cursor;
 
 #[test]
 fn save_load() {
-    use svo::save_load::{ReadSVO, WriteSVO}; // Why isn't this reexported with 'pub mod save_load;'?
     let mut svo = SVO::floor();
 
     svo.set_block(&[1, 3], VoxelData::new(2));
