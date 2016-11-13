@@ -44,14 +44,7 @@ impl SVO {
         SVO::Voxel { data: voxel_data }
     }
 
-    pub fn new_octants<F>(make_octant: F) -> SVO 
-            where F: Fn(u8) -> SVO {
-        SVO::Octants(
-            (0..8).map(|i| Box::new(make_octant(i)))
-                  .collect())
-    }
-
-    pub fn new_octants_mut<F>(mut make_octant: F) -> SVO
+    pub fn new_octants<F>(mut make_octant: F) -> SVO
             where F: FnMut(u8) -> SVO {
         SVO::Octants(
             (0..8).map(|i| Box::new(make_octant(i)))
