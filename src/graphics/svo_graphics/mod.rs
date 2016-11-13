@@ -9,9 +9,17 @@ mod test;
 impl SVO {
     pub fn fill_instances(&self, instances: &mut [Instance]) -> u32 {
         let instances_len = instances.len();
-        let mut instance_iter = instances.iter_mut();
-        self.fill_instances_helper(&mut instance_iter, [0.0, 0.0, 0.0], 1.0);
-        (instances_len - instance_iter.len()) as u32
+        let filled_len = {
+            let mut instance_iter = instances.iter_mut();
+            self.fill_instances_helper(&mut instance_iter, [0.0, 0.0, 0.0], 1.0);
+            (instances_len - instance_iter.len()) as u32
+        };
+        println!("[");
+        for i in 0..filled_len {
+            println!("\t {:?}, ", instances[i as usize]);
+        }
+        println!("]");
+        filled_len
     }
 
     fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: [f32; 3], side_len: f32) {
@@ -47,36 +55,36 @@ macro_rules! vert (($p:expr, $t:expr) => (
 ));
 
 pub const CUBE_VERTS: [Vertex; 24] = [
-    // top (0, 0, 1)
-    vert!([-1, -1,  1], [0, 0]),
-    vert!([ 1, -1,  1], [1, 0]),
+    // top
+    vert!([ 0,  0,  1], [0, 0]),
+    vert!([ 1,  0,  1], [1, 0]),
     vert!([ 1,  1,  1], [1, 1]),
-    vert!([-1,  1,  1], [0, 1]),
-    // bottom (0, 0, -1)
-    vert!([-1,  1, -1], [1, 0]),
-    vert!([ 1,  1, -1], [0, 0]),
-    vert!([ 1, -1, -1], [0, 1]),
-    vert!([-1, -1, -1], [1, 1]),
-    // right (1, 0, 0)
-    vert!([ 1, -1, -1], [0, 0]),
-    vert!([ 1,  1, -1], [1, 0]),
+    vert!([ 0,  1,  1], [0, 1]),
+    // bottom
+    vert!([ 0,  1,  0], [1, 0]),
+    vert!([ 1,  1,  0], [0, 0]),
+    vert!([ 1,  0,  0], [0, 1]),
+    vert!([ 0,  0,  0], [1, 1]),
+    // right
+    vert!([ 1,  0,  0], [0, 0]),
+    vert!([ 1,  1,  0], [1, 0]),
     vert!([ 1,  1,  1], [1, 1]),
-    vert!([ 1, -1,  1], [0, 1]),
-    // left (-1, 0, 0)
-    vert!([-1, -1,  1], [1, 0]),
-    vert!([-1,  1,  1], [0, 0]),
-    vert!([-1,  1, -1], [0, 1]),
-    vert!([-1, -1, -1], [1, 1]),
-    // front (0, 1, 0)
-    vert!([ 1,  1, -1], [1, 0]),
-    vert!([-1,  1, -1], [0, 0]),
-    vert!([-1,  1,  1], [0, 1]),
+    vert!([ 1,  0,  1], [0, 1]),
+    // left
+    vert!([ 0,  0,  1], [1, 0]),
+    vert!([ 0,  1,  1], [0, 0]),
+    vert!([ 0,  1,  0], [0, 1]),
+    vert!([ 0,  0,  0], [1, 1]),
+    // front
+    vert!([ 1,  1,  0], [1, 0]),
+    vert!([ 0,  1,  0], [0, 0]),
+    vert!([ 0,  1,  1], [0, 1]),
     vert!([ 1,  1,  1], [1, 1]),
-    // back (0, -1, 0)
-    vert!([ 1, -1,  1], [0, 0]),
-    vert!([-1, -1,  1], [1, 0]),
-    vert!([-1, -1, -1], [1, 1]),
-    vert!([ 1, -1, -1], [0, 1]),
+    // back
+    vert!([ 1,  0,  1], [0, 0]),
+    vert!([ 0,  0,  1], [1, 0]),
+    vert!([ 0,  0,  0], [1, 1]),
+    vert!([ 1,  0,  0], [0, 1]),
 ];
 
 pub const CUBE_INDICES: [u16; 36] = [

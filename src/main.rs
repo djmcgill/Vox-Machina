@@ -45,7 +45,9 @@ struct App<R: gfx::Resources>{
     svo: SVO
 }
 
-fn update_instances(instances: &mut [Instance]) {} // TODO
+fn update_instances(svo: &SVO, instances: &mut [Instance]) -> u32 {
+    svo.fill_instances(instances)
+}
 const MAX_INSTANCE_COUNT: usize = 2048;
 
 impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
@@ -63,7 +65,18 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
             .. gfx_app::shade::Source::empty()
         };
 
-        let svo = SVO::new_voxel(VoxelData::new(1));
+    let sub_svo = SVO::Octants([
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        Box::new(SVO::new_voxel(VoxelData::new(0))), Box::new(SVO::new_voxel(VoxelData::new(0))),
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+    ]);
+    let svo = SVO::Octants([
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
+        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+    ]);
 
         let (instance_buffer, mut instance_mapping) = factory
             .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
@@ -120,7 +133,8 @@ impl<R: gfx::Resources> gfx_app::Application<R> for App<R> {
 
     fn render<C: gfx::CommandBuffer<R>>(&mut self, encoder: &mut gfx::Encoder<R, C>) {
         let mut instances = self.mapping.read_write();
-        update_instances(&mut instances);
+        let instance_count = update_instances(&self.svo, &mut instances);
+        self.bundle.slice.instances = Some((instance_count, 0));
         let locals = Locals { transform: self.bundle.data.transform };
         encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
         encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
