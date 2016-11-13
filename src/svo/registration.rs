@@ -1,11 +1,11 @@
 use svo::voxel_data::VoxelData;
-use nalgebra::Vec3;
+use nalgebra::Vector3;
 
-pub type RegisterExtern = extern "stdcall" fn(Vec3<f32>, i32, VoxelData) -> u32;
+pub type RegisterExtern = extern "stdcall" fn(Vector3<f32>, i32, VoxelData) -> u32;
 pub type DeregisterExtern = extern "stdcall" fn(u32);
 
 pub struct RegistrationFunctions<'a> {
-    pub register: Box<Fn(Vec3<f32>, i32, VoxelData) -> u32 + 'a>,
+    pub register: Box<Fn(Vector3<f32>, i32, VoxelData) -> u32 + 'a>,
     pub deregister: Box<Fn(u32) + 'a>
 }
 

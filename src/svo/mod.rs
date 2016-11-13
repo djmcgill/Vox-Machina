@@ -9,7 +9,7 @@ mod generator;
 #[cfg(test)]
 mod test;
 
-use nalgebra::Vec3;
+use nalgebra::Vector3;
 pub use self::registration::*;
 pub use self::voxel_data::VoxelData;
 
@@ -24,6 +24,21 @@ pub enum SVO {
 }
 
 impl SVO {
+    pub fn example() -> SVO {
+        let sub_svo = SVO::Octants([
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+            Box::new(SVO::new_voxel(VoxelData::new(0))), Box::new(SVO::new_voxel(VoxelData::new(0))),
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        ]);
+        SVO::Octants([
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
+            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+        ])
+    }
+
     pub fn new_voxel(voxel_data: VoxelData) -> SVO {
         SVO::Voxel { data: voxel_data }
     }
@@ -61,23 +76,23 @@ impl SVO {
 }
 
 // Returns a vector with either 0. or 1. as its elements
-pub fn above_axis(ix: u8) -> Vec3<f32> {
-    Vec3::new((ix & 1) as f32,
+pub fn above_axis(ix: u8) -> Vector3<f32> {
+    Vector3::new((ix & 1) as f32,
               ((ix >> 1) & 1) as f32,
               ((ix >> 2) & 1) as f32)
 }
 
 // Returns the new origin of the child at the given index in global space.
-pub fn offset(ix: u8, depth: i32) -> Vec3<f32> {
+pub fn offset(ix: u8, depth: i32) -> Vector3<f32> {
     let side_len = 1.0 / (1 << (depth+1)) as f32;
     offset_float(ix, side_len)
 }
 
-pub fn offset_float(ix: u8, side_len: f32) -> Vec3<f32> {
+pub fn offset_float(ix: u8, side_len: f32) -> Vector3<f32> {
     above_axis(ix) * side_len
 }
 
-pub fn index(v: Vec3<f32>) -> u8 {
+pub fn index(v: Vector3<f32>) -> u8 {
     let above_x = (v.x > 0.5) as u8;
     let above_y = (v.y > 0.5) as u8;
     let above_z = (v.z > 0.5) as u8;

@@ -14,7 +14,6 @@
 // Modified by David McGillicuddy
 #![allow(dead_code)]
 
-extern crate cgmath;
 extern crate env_logger;
 #[macro_use]
 extern crate gfx;
@@ -39,7 +38,7 @@ mod svo;
 mod graphics;
 
 use gfx::{Bundle, Factory, texture};
-use svo::{SVO, VoxelData};
+use svo::SVO;
 use graphics::*;
 
 pub struct Config {
@@ -114,23 +113,11 @@ impl App {
     }
 
     fn new(mut factory: F, init: Init) -> Self {
-        use cgmath::{Point3, Vector3};
-        use cgmath::{Transform, AffineMatrix3};
         use gfx::traits::FactoryExt;
+        use nalgebra;
+        use nalgebra::ToHomogeneous;
 
-        let sub_svo = SVO::Octants([
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-            Box::new(SVO::new_voxel(VoxelData::new(0))), Box::new(SVO::new_voxel(VoxelData::new(0))),
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        ]);
-        let svo = SVO::Octants([
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
-            Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        ]);
-
+        let svo = SVO::example();
         let (instance_buffer, mut instance_mapping) = factory
             .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
                                          gfx::buffer::Role::Vertex,
@@ -158,17 +145,17 @@ impl App {
         let ps = include_bytes!("shader/cube_150.glslf");
         let pso = factory.create_pipeline_simple(vs, ps, pipe::new()).unwrap();
 
-        let view: AffineMatrix3<f32> = Transform::look_at(
-            Point3::new(1.5f32, -5.0, 3.0),
-            Point3::new(0f32, 0.0, 0.0),
-            Vector3::unit_z(),
-        );
-        let proj = cgmath::perspective(cgmath::deg(45.0f32), init.aspect_ratio, 1.0, 10.0);
+        let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0);
+        let target = nalgebra::Point3::<f32>::new(0.0, 0.0, 0.0);
+        let up = nalgebra::Vector3::<f32>::z();
+        let view = nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up);
+        let proj = nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 10.0);
+        let transform = proj.to_matrix() * view.to_homogeneous();
 
         let data = pipe::Data {
             vbuf: quad_vertices,
             instance: instance_buffer,
-            transform: (proj * view.mat).into(),
+            transform: transform.as_ref().clone(),
             locals: factory.create_constant_buffer(1),
             color: (texture_view, factory.create_sampler(sinfo)),
             out_color: init.color,
@@ -188,9 +175,9 @@ impl App {
             let mut instances = self.mapping.read_write();
             let instance_count = update_instances(&self.svo, &mut instances);
             self.bundle.slice.instances = Some((instance_count, 0));
-            let locals = Locals { transform: self.bundle.data.transform };
-            self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
         }
+        let locals = Locals { transform: self.bundle.data.transform };
+        self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
         self.encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
         self.encoder.clear_depth(&self.bundle.data.out_depth, 1.0);
         self.encoder.draw(&self.bundle.slice, &self.bundle.pso, &self.bundle.data);

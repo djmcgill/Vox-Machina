@@ -1,6 +1,6 @@
 use quickcheck::*;
 
-use nalgebra::{ApproxEq, Vec3, zero};
+use nalgebra::{ApproxEq, Vector3, zero};
 use svo::*;
 
 impl Clone for SVO {
@@ -143,7 +143,7 @@ impl SVO {
         }
     }
 
-    fn collect_svo(&self, results_vec: &mut Vec<(f32, f32, f32, i32, i32)>, origin: Vec3<f32>, depth: i32) {
+    fn collect_svo(&self, results_vec: &mut Vec<(f32, f32, f32, i32, i32)>, origin: Vector3<f32>, depth: i32) {
         match *self {
             SVO::Voxel { data: VoxelData { voxel_type, .. } } =>
                 results_vec.push((origin.x, origin.y, origin.z, depth, voxel_type)),

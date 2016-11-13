@@ -5,9 +5,8 @@ authors = ["David McGillicuddy <contact@djmcgill.co.uk>"]
 
 [dependencies]
 byteorder = "0.5.0"
-nalgebra = "0.5.1"
+nalgebra = "0.10.1"
 glutin = "*"
-cgmath = "0.7"
 env_logger = "0.3"
 
 [dependencies.gfx]
