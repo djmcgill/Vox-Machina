@@ -1,6 +1,8 @@
 pub mod svo_graphics;
 
-pub use gfx_app::{ColorFormat, DepthFormat};
+use gfx;
+pub type ColorFormat = gfx::format::Rgba8;
+pub type DepthFormat = gfx::format::DepthStencil;
 
 gfx_defines!{
     vertex Vertex {

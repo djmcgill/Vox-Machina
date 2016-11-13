@@ -9,17 +9,9 @@ mod test;
 impl SVO {
     pub fn fill_instances(&self, instances: &mut [Instance]) -> u32 {
         let instances_len = instances.len();
-        let filled_len = {
-            let mut instance_iter = instances.iter_mut();
-            self.fill_instances_helper(&mut instance_iter, [0.0, 0.0, 0.0], 1.0);
-            (instances_len - instance_iter.len()) as u32
-        };
-        println!("[");
-        for i in 0..filled_len {
-            println!("\t {:?}, ", instances[i as usize]);
-        }
-        println!("]");
-        filled_len
+        let mut instance_iter = instances.iter_mut();
+        self.fill_instances_helper(&mut instance_iter, [0.0, 0.0, 0.0], 1.0);
+        (instances_len - instance_iter.len()) as u32
     }
 
     fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: [f32; 3], side_len: f32) {
