@@ -8,6 +8,7 @@ byteorder = "0.5.0"
 nalgebra = "0.10.1"
 glutin = "0.7"
 env_logger = "0.3"
+arrayvec = "0.3"
 
 [dependencies.gfx]
 git = "https://github.com/gfx-rs/gfx.git"

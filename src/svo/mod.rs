@@ -13,6 +13,8 @@ use nalgebra::Vector3;
 pub use self::registration::*;
 pub use self::voxel_data::VoxelData;
 
+use arrayvec::ArrayVec;
+
 // Each SVO assumes that it's the cube between (0,0,0) and (1,1,1)
 #[derive(Debug, PartialEq)]
 pub enum SVO {
@@ -20,23 +22,23 @@ pub enum SVO {
 
     // For a given point (x, y, z), the index of its octant is
     // ((x >= 0.5) << 0) | ((y >= 0.5) << 1) | ((z <= 0.5) << 2)
-    Octants ([Box<SVO>; 8])
+    Octants (ArrayVec<[Box<SVO>; 8]>)
 }
 
 impl SVO {
     pub fn example() -> SVO {
-        let sub_svo = SVO::Octants([
+        let sub_svo = SVO::Octants(ArrayVec::from ([
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
             Box::new(SVO::new_voxel(VoxelData::new(0))), Box::new(SVO::new_voxel(VoxelData::new(0))),
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        ]);
-        SVO::Octants([
+        ]));
+        SVO::Octants(ArrayVec::from ([
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(sub_svo),
             Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-        ])
+        ]))
     }
 
     pub fn new_voxel(voxel_data: VoxelData) -> SVO {
@@ -44,11 +46,12 @@ impl SVO {
     }
 
     pub fn new_octants<F: Fn(u8) -> SVO>(make_octant: F) -> SVO {
-        SVO::Octants([
+        SVO::Octants(ArrayVec::from ([
             Box::new(make_octant(0)), Box::new(make_octant(1)),
             Box::new(make_octant(2)), Box::new(make_octant(3)),
             Box::new(make_octant(4)), Box::new(make_octant(5)),
-            Box::new(make_octant(6)), Box::new(make_octant(7))])
+            Box::new(make_octant(6)), Box::new(make_octant(7)),
+        ]))
     }
 
     // If the SVO is a Voxel, return its contents.
@@ -60,14 +63,14 @@ impl SVO {
     }
 
     // If the SVO is Octants, return its contents.
-    fn get_octants(&self) -> Option<&[Box<SVO>; 8]> {
+    fn get_octants(&self) -> Option<&ArrayVec<[Box<SVO>; 8]>> {
         match *self {
             SVO::Octants(ref octants) => Some(octants),
             _ => None
         }
     }
 
-    fn get_mut_octants(&mut self) -> Option<&mut [Box<SVO>; 8]> {
+    fn get_mut_octants(&mut self) -> Option<&mut ArrayVec<[Box<SVO>; 8]>> {
         match *self {
             SVO::Octants(ref mut octants) => Some(octants),
             _ => None

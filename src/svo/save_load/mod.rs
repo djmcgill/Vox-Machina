@@ -2,6 +2,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Read, Write, Result, Error, ErrorKind};
 use svo::*;
 use std::mem;
+use arrayvec::ArrayVec;
 
 #[cfg(test)]
 mod test;
@@ -35,9 +36,11 @@ pub trait ReadSVO: Read {
             },
             OCTANT_TAG => {
                 // TODO: use mem::uninitialized here
-                let mut octants: [Box<SVO>; 8] =
-                    [Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
-                     Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1)))];
+                let mut octants: ArrayVec<[Box<SVO>; 8]> =
+                    ArrayVec::from (
+                        [Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))),
+                        Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1))), Box::new(SVO::new_voxel(VoxelData::new(1)))
+                    ]);
 
                 for ix in 0..8 {
                     let result: SVO = try!{ self.read_svo_from() };

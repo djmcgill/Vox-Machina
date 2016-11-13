@@ -2,6 +2,7 @@
 mod test;
 
 use svo::*;
+use arrayvec::ArrayVec;
 
 impl SVO {
     // Follow an index, splitting voxels as necessary. The set the block at the target to a Voxel with the specified data.
@@ -59,7 +60,7 @@ impl SVO {
 }
 
 // Return the voxel_data that all of the octants share, or None.
-fn combine_voxels(octants: &[Box<SVO>; 8]) -> Option<VoxelData> {
+fn combine_voxels(octants: &ArrayVec<[Box<SVO>; 8]>) -> Option<VoxelData> {
         octants[0].get_voxel_data().and_then(|voxel_data| {
             let first_data = Some(voxel_data);
             for octant in &octants[1..] { guard!(octant.get_voxel_data() == first_data) }
