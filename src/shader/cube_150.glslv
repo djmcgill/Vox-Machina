@@ -1,6 +1,6 @@
 #version 150 core
 
-in vec4 a_Pos;
+in vec3 a_Pos;
 in vec2 a_TexCoord;
 in vec3 a_Translate;
 in float a_Scale;
@@ -12,6 +12,6 @@ uniform Locals {
 
 void main() {
     v_TexCoord = a_TexCoord;
-    gl_Position = u_Transform * (a_Pos * a_Scale + vec4(a_Translate, 1.0));
+    gl_Position = u_Transform * vec4(a_Pos * a_Scale + a_Translate, 1.0);
     gl_ClipDistance[0] = 1.0;
 }
