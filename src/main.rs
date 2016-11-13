@@ -148,7 +148,7 @@ impl App {
         let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0);
         let target = nalgebra::Point3::<f32>::new(0.0, 0.0, 0.0);
         let up = nalgebra::Vector3::<f32>::z();
-        let view = nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up);
+        let view = nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up); // TODO: build from Rotation3::look_at_rh
         let proj = nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 10.0);
         let transform = proj.to_matrix() * view.to_homogeneous();
 
