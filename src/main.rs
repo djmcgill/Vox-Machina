@@ -60,6 +60,8 @@ struct App {
     mapping: gfx::mapping::RWable<R, Instance>,
     svo: SVO,
     encoder: gfx::Encoder<R, C>,
+    view: nalgebra::Matrix4<f32>,
+    proj: nalgebra::Matrix4<f32>,
 }
 
 fn update_instances(svo: &SVO, instances: &mut [Instance]) -> u32 {
@@ -119,11 +121,11 @@ impl App {
         use nalgebra;
         use nalgebra::ToHomogeneous;
 
-        let svo = SVO::example();
         let (instance_buffer, mut instance_mapping) = factory
             .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
                                          gfx::buffer::Role::Vertex,
                                          gfx::Bind::empty());
+        let svo = SVO::example();
         let instance_count = {
             let mut instances = instance_mapping.read_write();
             svo.fill_instances(&mut instances)
@@ -147,27 +149,26 @@ impl App {
         let ps = include_bytes!("shader/cube_150.glslf");
         let pso = factory.create_pipeline_simple(vs, ps, pipe::new()).unwrap();
 
-        let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0);
-        let target = nalgebra::Point3::<f32>::new(0.0, 0.0, 0.0);
-        let up = nalgebra::Vector3::<f32>::z();
-        let view = nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up); // TODO: build from Rotation3::look_at_rh
-        let proj = nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 10.0);
-        let transform = proj.to_matrix() * view.to_homogeneous();
-
         let data = pipe::Data {
             vbuf: quad_vertices,
             instance: instance_buffer,
-            transform: transform.as_ref().clone(),
+            transform: nalgebra::one::<nalgebra::Matrix4<f32>>().as_ref().clone(),
             color: (texture_view, factory.create_sampler(sinfo)),
             out_color: init.color,
             out_depth: init.depth,
         };
+
+        let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0);
+        let target = nalgebra::Point3::<f32>::new(0.0, 0.0, 0.0);
+        let up = nalgebra::Vector3::<f32>::z();
 
         App {
             bundle: Bundle::new(slice, pso, data),
             mapping: instance_mapping,
             svo: svo,
             encoder: factory.create_command_buffer().into(),
+            view: nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up).to_homogeneous(), // TODO: build from Rotation3::look_at_rh
+            proj: nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 10.0).to_matrix(),
         }
     }
 
@@ -178,11 +179,8 @@ impl App {
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
-        // self.bundle.data.transform = [[1.0, 0.0, 0.0, 0.0],
-        //      [0.0, 1.0, 0.0, 0.0],
-        //      [0.0, 0.0, 1.0, 0.0],
-        //      [0.0, 0.0, 0.0, 1.0]];
-
+        let transform = self.proj * self.view;
+        self.bundle.data.transform.clone_from(transform.as_ref());
 
         self.encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
         self.encoder.clear_depth(&self.bundle.data.out_depth, 1.0);
