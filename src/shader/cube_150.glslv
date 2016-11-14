@@ -5,10 +5,7 @@ in vec2 a_TexCoord;
 in vec3 a_Translate;
 in float a_Scale;
 out vec2 v_TexCoord;
-
-uniform Locals {
-	mat4 u_Transform;
-};
+uniform mat4 u_Transform;
 
 void main() {
     v_TexCoord = a_TexCoord;

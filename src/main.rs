@@ -158,7 +158,6 @@ impl App {
             vbuf: quad_vertices,
             instance: instance_buffer,
             transform: transform.as_ref().clone(),
-            locals: factory.create_constant_buffer(1),
             color: (texture_view, factory.create_sampler(sinfo)),
             out_color: init.color,
             out_depth: init.depth,
@@ -178,8 +177,13 @@ impl App {
             let instance_count = update_instances(&self.svo, &mut instances);
             self.bundle.slice.instances = Some((instance_count, 0));
         }
-        let locals = Locals { transform: self.bundle.data.transform };
-        self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
+
+        // self.bundle.data.transform = [[1.0, 0.0, 0.0, 0.0],
+        //      [0.0, 1.0, 0.0, 0.0],
+        //      [0.0, 0.0, 1.0, 0.0],
+        //      [0.0, 0.0, 0.0, 1.0]];
+
+
         self.encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
         self.encoder.clear_depth(&self.bundle.data.out_depth, 1.0);
         self.encoder.draw(&self.bundle.slice, &self.bundle.pso, &self.bundle.data);
