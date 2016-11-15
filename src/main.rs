@@ -152,7 +152,7 @@ impl App {
         let data = pipe::Data {
             vbuf: quad_vertices,
             instance: instance_buffer,
-            transform: nalgebra::one::<nalgebra::Matrix4<f32>>().as_ref().clone(),
+            locals: factory.create_constant_buffer(1),
             color: (texture_view, factory.create_sampler(sinfo)),
             out_color: init.color,
             out_depth: init.depth,
@@ -179,8 +179,9 @@ impl App {
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
-        let transform = self.proj * self.view;
-        self.bundle.data.transform.clone_from(transform.as_ref());
+        let transform = (self.proj * self.view).as_ref().clone();
+        let locals = Locals { transform: transform };
+        self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);        
 
         self.encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
         self.encoder.clear_depth(&self.bundle.data.out_depth, 1.0);

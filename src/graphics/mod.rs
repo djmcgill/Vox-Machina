@@ -15,10 +15,14 @@ gfx_defines!{
         scale: f32 = "a_Scale",
     }
 
+    constant Locals {
+        transform: [[f32; 4]; 4] = "u_Transform",
+    }
+
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         instance: gfx::InstanceBuffer<Instance> = (),
-        transform: gfx::Global<[[f32; 4]; 4]> = "u_Transform",
+        locals: gfx::ConstantBuffer<Locals> = "Locals",
         color: gfx::TextureSampler<[f32; 4]> = "t_Color",
         out_color: gfx::RenderTarget<ColorFormat> = "Target0",
         out_depth: gfx::DepthTarget<DepthFormat> =
