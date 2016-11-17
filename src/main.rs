@@ -179,7 +179,7 @@ impl App {
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
-        let transform = *(self.proj * self.view).as_ref();
+        let transform = *&(self.proj * self.view);
         let locals = Locals { transform: transform };
         self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);        
 

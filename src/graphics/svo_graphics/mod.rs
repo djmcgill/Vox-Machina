@@ -1,4 +1,5 @@
 use graphics::{Instance, Vertex};
+use nalgebra::Vector3;
 use svo;
 use svo::SVO;
 use std::slice::IterMut;
@@ -10,11 +11,11 @@ impl SVO {
     pub fn fill_instances(&self, instances: &mut [Instance]) -> u32 {
         let instances_len = instances.len();
         let mut instance_iter = instances.iter_mut();
-        self.fill_instances_helper(&mut instance_iter, [0.0, 0.0, 0.0], 1.0);
+        self.fill_instances_helper(&mut instance_iter, Vector3::new(0.0, 0.0, 0.0), 1.0);
         (instances_len - instance_iter.len()) as u32
     }
 
-    fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: [f32; 3], side_len: f32) {
+    fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: Vector3<f32>, side_len: f32) {
         match self {
             &SVO::Voxel{ data } if data.voxel_type == 0 => {},
             &SVO::Voxel{..} => {
@@ -26,13 +27,8 @@ impl SVO {
             &SVO::Octants(ref suboctants) => {
                 for i in 0..8 {
                     let new_scale: f32 = side_len/2.0;
-                    let vec = svo::offset_float(i as u8, new_scale);
-                    let new_origin: [f32; 3] = [ // FIXME: so gross
-                        origin[0] + vec.x,
-                        origin[1] + vec.y,
-                        origin[2] + vec.z
-                    ];
-                    suboctants[i].fill_instances_helper(instances_iter, new_origin, new_scale);
+                    let offset = svo::offset_float(i as u8, new_scale);
+                    suboctants[i].fill_instances_helper(instances_iter, origin + offset, new_scale);
                 }
             }
         }
