@@ -1,7 +1,7 @@
 #version 150 core
 
 in vec2 v_TexCoord;
-flat in float v_SideWidth;
+in float v_SideWidth;
 out vec4 Target0;
 
 uniform sampler2D t_Color;

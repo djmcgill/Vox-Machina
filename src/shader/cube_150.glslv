@@ -4,7 +4,7 @@ in vec3 a_Pos;
 in vec2 a_TexCoord;
 in vec3 a_Translate;
 in float a_SideWidth;
-flat out float v_SideWidth;
+out float v_SideWidth;
 out vec2 v_TexCoord;
 
 uniform Locals {
