@@ -20,6 +20,8 @@ extern crate gfx;
 #[macro_use]
 extern crate nalgebra;
 extern crate byteorder;
+#[macro_use]
+extern crate log;
 #[cfg(test)]
 extern crate quickcheck;
 extern crate glutin;

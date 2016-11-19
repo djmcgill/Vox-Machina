@@ -8,6 +8,7 @@ use graphics::*;
 use camera::OverheadCamera;
 use nalgebra;
 use svo::SVO;
+use std::collections::HashSet;
 
 pub struct Config {
     pub size: (u16, u16),
@@ -27,6 +28,7 @@ pub struct App {
     encoder: gfx::Encoder<R, C>,
     camera: OverheadCamera,
     proj: nalgebra::Matrix4<f32>,
+    keys_down: HashSet<glutin::VirtualKeyCode>, // TODO: use EnumSet instead
 }
 
 const MAX_INSTANCE_COUNT: u32 = 2048;
@@ -77,13 +79,36 @@ impl App {
                                                                   100.0)
                                        .to_matrix();
                     }
+                    glutin::Event::KeyboardInput(element_state, _, Some(key_code)) => {
+                        app.update_keys_down(element_state, key_code);
+                    }
                     _ => {}
                 }
             }
+
+            let dt = 1.0; // FIXME: calculate properly
+            app.camera.update(dt, &app.keys_down);
+
             // draw a frame
             app.render(&mut device);
             window.swap_buffers().unwrap();
             device.cleanup();
+        }
+    }
+
+    pub fn update_keys_down(&mut self,
+                            element_state: glutin::ElementState,
+                            key_code: glutin::VirtualKeyCode) {
+        debug!("key {:?} was {:?}", key_code, element_state);
+        match element_state {
+            glutin::ElementState::Pressed => {
+                let was_inserted = self.keys_down.insert(key_code);
+                assert!(was_inserted); // If false, weird things are happening
+            }
+            glutin::ElementState::Released => {
+                let was_removed = self.keys_down.remove(&key_code);
+                assert!(was_removed); // If false, weird things are happening
+            }
         }
     }
 
@@ -134,6 +159,7 @@ impl App {
             mapping: instance_mapping,
             svo: svo,
             svo_max_height: max_height,
+            keys_down: HashSet::new(),
             encoder: factory.create_command_buffer().into(),
             camera: OverheadCamera::new(),
             proj: PerspectiveMatrix3::<f32>::new(init.aspect_ratio,
