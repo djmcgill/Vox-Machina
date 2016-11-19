@@ -8,27 +8,29 @@ use std::slice::IterMut;
 mod test;
 
 impl SVO {
-    pub fn fill_instances(&self, instances: &mut [Instance]) -> u32 {
+    pub fn fill_instances(&self, instances: &mut [Instance], max_height: i32) -> u32 {
         let instances_len = instances.len();
         let mut instance_iter = instances.iter_mut();
-        self.fill_instances_helper(&mut instance_iter, Vector3::new(0.0, 0.0, 0.0), 1.0);
-        (instances_len - instance_iter.len()) as u32
+        self.fill_instances_helper(&mut instance_iter, Vector3::new(0.0, 0.0, 0.0), max_height);
+        let instance_count = instances_len - instance_iter.len(); 
+        assert!(instance_count <= u32::max_value() as usize);
+        instance_count as u32        
     }
 
-    fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: Vector3<f32>, side_len: f32) {
+    fn fill_instances_helper(&self, instances_iter: &mut IterMut<Instance>, origin: Vector3<f32>, height: i32) {
         match self {
             &SVO::Voxel{ data } if data.voxel_type == 0 => {},
             &SVO::Voxel{..} => {
                 *instances_iter.next().unwrap() = Instance { // Deliberately panic when the array is not long enough
-                    translate: origin,                       // TODO: dynamically extend the array somehow?
-                    scale: side_len,
+                    translate: *origin.as_ref(),             // TODO: dynamically extend the array somehow?
+                    height: height,
                 }
             },
             &SVO::Octants(ref suboctants) => {
                 for i in 0..8 {
-                    let new_scale: f32 = side_len/2.0;
-                    let offset = svo::offset_float(i as u8, new_scale);
-                    suboctants[i].fill_instances_helper(instances_iter, origin + offset, new_scale);
+                    let new_height = height - 1;
+                    let offset = svo::offset_float(i as u8, f32::powi(2.0, new_height));
+                    suboctants[i].fill_instances_helper(instances_iter, origin + offset, new_height);
                 }
             }
         }

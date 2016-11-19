@@ -12,7 +12,7 @@ gfx_defines!{
 
     vertex Instance {
         translate: [f32; 3] = "a_Translate",
-        scale: f32 = "a_Scale",
+        height: i32 = "a_Height",
     }
 
     constant Locals {
@@ -27,5 +27,11 @@ gfx_defines!{
         out_color: gfx::RenderTarget<ColorFormat> = "Target0",
         out_depth: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
+    }
+}
+
+impl PartialEq for Instance {
+    fn eq(&self, other: &Self) -> bool {
+        self.translate == other.translate && self.height == other.height
     }
 }

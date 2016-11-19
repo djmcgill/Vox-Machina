@@ -59,15 +59,13 @@ struct App {
     bundle: Bundle<R, pipe::Data<R>>,
     mapping: gfx::mapping::RWable<R, Instance>,
     svo: SVO,
+    svo_max_height: i32,
     encoder: gfx::Encoder<R, C>,
     view: nalgebra::Matrix4<f32>,
     proj: nalgebra::Matrix4<f32>,
 }
 
-fn update_instances(svo: &SVO, instances: &mut [Instance]) -> u32 {
-    svo.fill_instances(instances)
-}
-const MAX_INSTANCE_COUNT: usize = 2048;
+const MAX_INSTANCE_COUNT: u32 = 2048;
 
 pub struct Init {
     pub color: gfx::handle::RenderTargetView<R, ColorFormat>,
@@ -122,15 +120,16 @@ impl App {
         use nalgebra::ToHomogeneous;
 
         let (instance_buffer, mut instance_mapping) = factory
-            .create_buffer_persistent_rw(MAX_INSTANCE_COUNT,
+            .create_buffer_persistent_rw(MAX_INSTANCE_COUNT as usize,
                                          gfx::buffer::Role::Vertex,
                                          gfx::Bind::empty());
         let svo = SVO::example();
+        let max_height = 2;
         let instance_count = {
             let mut instances = instance_mapping.read_write();
-            svo.fill_instances(&mut instances)
+            svo.fill_instances(&mut instances, max_height)
         };
-        assert!(instance_count as usize <= MAX_INSTANCE_COUNT);
+        assert!(instance_count <= MAX_INSTANCE_COUNT);
 
         let (quad_vertices, mut slice) = factory
             .create_vertex_buffer_with_slice(&svo_graphics::CUBE_VERTS, &svo_graphics::CUBE_INDICES[..]);
@@ -152,13 +151,13 @@ impl App {
         let data = pipe::Data {
             vbuf: quad_vertices,
             instance: instance_buffer,
-            locals: factory.create_constant_buffer(1),
+            locals: factory.create_constant_buffer::<Locals>(1),
             color: (texture_view, factory.create_sampler(sinfo)),
             out_color: init.color,
             out_depth: init.depth,
         };
 
-        let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0);
+        let eye = nalgebra::Point3::<f32>::new(1.5, -5.0, 3.0) * 3.0;
         let target = nalgebra::Point3::<f32>::new(0.0, 0.0, 0.0);
         let up = nalgebra::Vector3::<f32>::z();
 
@@ -166,21 +165,23 @@ impl App {
             bundle: Bundle::new(slice, pso, data),
             mapping: instance_mapping,
             svo: svo,
+            svo_max_height: max_height,
             encoder: factory.create_command_buffer().into(),
             view: nalgebra::Isometry3::<f32>::look_at_rh(&eye, &target, &up).to_homogeneous(), // TODO: build from Rotation3::look_at_rh
-            proj: nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 10.0).to_matrix(),
+            proj: nalgebra::PerspectiveMatrix3::<f32>::new(init.aspect_ratio, 45.0f32.to_radians(), 1.0, 100.0).to_matrix(),
         }
     }
 
     fn render<D>(&mut self, device: &mut D) where D: gfx::Device<Resources = R, CommandBuffer = C> {
         {
             let mut instances = self.mapping.read_write();
-            let instance_count = update_instances(&self.svo, &mut instances);
+            let instance_count = self.svo.fill_instances(&mut instances, self.svo_max_height);
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
-        let transform = *&(self.proj * self.view);
-        let locals = Locals { transform: transform };
+        let locals = Locals {
+            transform: *(self.proj * self.view).as_ref(),
+        };
         self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);        
 
         self.encoder.clear(&self.bundle.data.out_color, [0.1, 0.2, 0.3, 1.0]);
@@ -192,5 +193,5 @@ impl App {
 }
 
 pub fn main() {
-    App::launch("Cube example", DEFAULT_CONFIG);
+    App::launch("Vox Machina", DEFAULT_CONFIG);
 }
