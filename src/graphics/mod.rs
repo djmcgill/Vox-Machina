@@ -12,7 +12,7 @@ gfx_defines!{
 
     vertex Instance {
         translate: [f32; 3] = "a_Translate",
-        height: i32 = "a_Height",
+        side_width: f32 = "a_SideWidth",
     }
 
     constant Locals {
@@ -32,6 +32,6 @@ gfx_defines!{
 
 impl PartialEq for Instance {
     fn eq(&self, other: &Self) -> bool {
-        self.translate == other.translate && self.height == other.height
+        self.translate == other.translate && self.side_width == other.side_width
     }
 }
