@@ -10,6 +10,7 @@ gfx_defines!{
         tex_coord: [f32; 2] = "a_TexCoord",
     }
 
+    #[derive(PartialEq)]
     vertex Instance {
         translate: [f32; 3] = "a_Translate",
         side_width: f32 = "a_SideWidth",
@@ -27,11 +28,5 @@ gfx_defines!{
         out_color: gfx::RenderTarget<ColorFormat> = "Target0",
         out_depth: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
-    }
-}
-
-impl PartialEq for Instance {
-    fn eq(&self, other: &Self) -> bool {
-        self.translate == other.translate && self.side_width == other.side_width
     }
 }
