@@ -5,7 +5,7 @@ use gfx;
 use gfx::{Bundle, Factory, texture};
 use glutin;
 use graphics::*;
-use camera::OverheadCamera;
+use graphics::camera::OverheadCamera;
 use nalgebra;
 use svo::SVO;
 use std::collections::HashSet;
@@ -102,8 +102,7 @@ impl App {
         debug!("key {:?} was {:?}", key_code, element_state);
         match element_state {
             glutin::ElementState::Pressed => {
-                let was_inserted = self.keys_down.insert(key_code);
-                assert!(was_inserted); // If false, weird things are happening
+                self.keys_down.insert(key_code);
             }
             glutin::ElementState::Released => {
                 let was_removed = self.keys_down.remove(&key_code);

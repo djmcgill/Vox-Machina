@@ -12,13 +12,13 @@ log = "0.3.6"
 arrayvec = "0.3"
 
 [dependencies.gfx]
-git = "https://github.com/djmcgill/gfx.git"
+git = "https://github.com/gfx-rs/gfx.git"
 
 [dependencies.gfx_window_glutin]
-git = "https://github.com/djmcgill/gfx.git"
+git = "https://github.com/gfx-rs/gfx.git"
 
 [dependencies.gfx_device_gl]
-git = "https://github.com/djmcgill/gfx.git"
+git = "https://github.com/gfx-rs/gfx.git"
 
 [dev-dependencies]
 quickcheck = "0.2"

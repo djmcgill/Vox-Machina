@@ -41,7 +41,6 @@ macro_rules! guard(
 mod app;
 mod svo;
 mod graphics;
-mod camera;
 
 use app::App;
 

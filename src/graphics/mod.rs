@@ -1,4 +1,5 @@
 pub mod svo_graphics;
+pub mod camera;
 
 use gfx;
 pub type ColorFormat = gfx::format::Rgba8;
