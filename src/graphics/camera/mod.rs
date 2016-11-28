@@ -1,4 +1,4 @@
-use nalgebra::{Isometry3, Matrix4, Point3, ToHomogeneous, Vector3};
+use nalgebra::{Isometry3, Matrix4, Point3, ToHomogeneous, Vector3, Rotation};
 use std::collections::HashSet;
 use glutin::VirtualKeyCode;
 
@@ -24,7 +24,7 @@ impl OverheadCamera {
         self.view
     }
 
-    pub fn update(&mut self, dt: f32, keys_down: &HashSet<VirtualKeyCode>) {
+    pub fn update_from_keys(&mut self, dt: f32, keys_down: &HashSet<VirtualKeyCode>) {
         if keys_down.contains(&VirtualKeyCode::Left) {
             self.iso.translation += Vector3::x() * dt;
         }
@@ -38,6 +38,12 @@ impl OverheadCamera {
             self.iso.translation -= Vector3::z() * dt * self.iso.rotation;
         }
 
+        self.view = self.iso.to_homogeneous();
+    }
+
+    pub fn rotate(&mut self, dt: f32, dist: f32) {
+        debug!("rotating by {}", dt * dist);
+        self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * dist * dt));
         self.view = self.iso.to_homogeneous();
     }
 }
