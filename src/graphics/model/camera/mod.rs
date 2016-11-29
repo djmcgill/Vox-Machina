@@ -1,5 +1,6 @@
 use nalgebra::*;
 
+#[derive(Debug)]
 pub struct OverheadCamera {
     iso: Isometry3<f32>,
     view: Matrix4<f32>, // Cached from the other parameters

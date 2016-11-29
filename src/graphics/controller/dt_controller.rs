@@ -1,5 +1,6 @@
 use std::time;
 
+#[derive(Debug)]
 pub struct DtController {
     last_instant: time::Instant,
 }

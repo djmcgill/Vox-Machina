@@ -6,12 +6,9 @@ use gfx::{Bundle, Factory, texture};
 use glutin;
 use glutin::ElementState;
 use graphics::*;
-use graphics::controller::CameraController;
-use graphics::controller::DtController;
-use graphics::key_down::KeyDown;
+use graphics::controller::{CameraController, DtController, KeysDownController};
 use nalgebra;
 use nalgebra::PerspectiveMatrix3;
-use std::collections::HashSet;
 use svo::SVO;
 
 pub struct Config {
@@ -32,7 +29,7 @@ pub struct App {
     encoder: gfx::Encoder<R, C>,
     camera_controller: CameraController,
     proj: nalgebra::Matrix4<f32>,
-    keys_down: HashSet<KeyDown>,
+    keys_down_controller: KeysDownController,
     drag_mouse_position: Option<(i32, i32)>,
     current_cursor_position: (i32, i32),
     dt_controller: DtController,
@@ -88,7 +85,7 @@ impl App {
                     self.proj = PerspectiveMatrix3::<f32>::new(new_aspect_ratio, 45.0f32.to_radians(), 1.0, 100.0).to_matrix();
                 },
                 KeyboardInput(element_state, _, Some(key_code)) => {
-                    self.update_keys_down(element_state, key_code);
+                    self.keys_down_controller.update(element_state, key_code);
                 },
                 MouseMoved(x, y) => {
                     if self.drag_mouse_position.is_some() {
@@ -106,28 +103,13 @@ impl App {
             }
         }
 
-        self.camera_controller.update_with_keys_mut(dt, &self.keys_down);
+        self.camera_controller.update_with_keys_mut(dt, &self.keys_down_controller.set);
 
         // draw a frame
         self.render(&mut device as &mut D);
         window.swap_buffers().unwrap();
         device.cleanup();
     }}
-
-    fn update_keys_down(&mut self,
-                        element_state: glutin::ElementState,
-                        key_code: glutin::VirtualKeyCode) {
-        match element_state {
-            glutin::ElementState::Pressed => {
-                let _ = self.keys_down.insert(KeyDown::Key(key_code));
-                // assert!(was_inserted); Watch out for key repeat from the OS!
-            }
-            glutin::ElementState::Released => {
-                let was_removed = self.keys_down.remove(&KeyDown::Key(key_code));
-                assert!(was_removed); // If false, weird things are happening
-            }
-        }
-    }
 
     fn new(mut factory: F, init: Init) -> Self {
         use gfx::traits::FactoryExt;
@@ -177,7 +159,7 @@ impl App {
             mapping: instance_mapping,
             svo: svo,
             svo_max_height: max_height,
-            keys_down: HashSet::new(),
+            keys_down_controller: KeysDownController::new(),
             encoder: factory.create_command_buffer().into(),
             camera_controller: CameraController::new(),
             drag_mouse_position: None,
