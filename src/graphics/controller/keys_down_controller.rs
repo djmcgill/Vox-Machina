@@ -1,6 +1,6 @@
-use graphics::key_down::KeyDown;
-use std::collections::HashSet;
 use glutin;
+use graphics::model::KeyDown;
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct KeysDownController {

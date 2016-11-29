@@ -1,6 +1,6 @@
 use graphics::model::camera::OverheadCamera;
 use std::collections::HashSet;
-use graphics::key_down::KeyDown;
+use graphics::model::KeyDown;
 
 #[derive(Debug)]
 pub struct CameraController {

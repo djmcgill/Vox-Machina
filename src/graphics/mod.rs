@@ -1,7 +1,6 @@
 pub mod svo_graphics;
 pub mod controller;
 pub mod model;
-pub mod key_down;
 
 use gfx;
 pub type ColorFormat = gfx::format::Rgba8;
