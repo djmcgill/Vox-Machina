@@ -1,10 +1,10 @@
-use glutin;
+use glutin::{ElementState, VirtualKeyCode};
 use graphics::model::KeyDown;
 use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct KeysDownController {
-    pub set: HashSet<KeyDown>
+    pub set: HashSet<KeyDown>,
 }
 
 impl KeysDownController {
@@ -12,14 +12,14 @@ impl KeysDownController {
         KeysDownController { set: HashSet::new(), }
     }
 
-    pub fn update(&mut self, element_state: glutin::ElementState, key_code: glutin::VirtualKeyCode) {
+    pub fn update(&mut self, element_state: ElementState, key_code: VirtualKeyCode) {
         match element_state {
-            glutin::ElementState::Pressed => {
-                let _was_inserted = self.set.insert(KeyDown::Key(key_code));
-                // assert!(was_inserted); Watch out for key repeat from the OS!
+            ElementState::Pressed => {
+                let _was_inserted = self.set.insert(key_code.into());
+                // assert!(_was_inserted); Watch out for key repeat from the OS!
             },
-            glutin::ElementState::Released => {
-                let was_removed = self.set.remove(&KeyDown::Key(key_code));
+            ElementState::Released => {
+                let was_removed = self.set.remove(&key_code.into());
                 assert!(was_removed); // If false, weird things are happening
             },
         }
