@@ -156,7 +156,7 @@ impl App {
         if keys_down.contains(&VirtualKeyCode::E.into()) {
             rot -= 1.0;
         }
-        camera.pan_rot_mut(dt, pan, rot);
+        camera.pan_rot_mut(dt, pan * CAMERA_PAN_MULT, rot * CAMERA_ROT_MULT);
     }
 
     fn update_dt(&mut self) -> f32 {
