@@ -1,6 +1,4 @@
-use nalgebra::{Isometry3, Matrix4, Point3, ToHomogeneous, Vector3, Rotation};
-use std::collections::HashSet;
-use glutin::VirtualKeyCode;
+use nalgebra::*;
 
 pub struct OverheadCamera {
     iso: Isometry3<f32>,
@@ -24,26 +22,17 @@ impl OverheadCamera {
         self.view
     }
 
-    pub fn update_from_keys(&mut self, dt: f32, keys_down: &HashSet<VirtualKeyCode>) {
-        if keys_down.contains(&VirtualKeyCode::Left) {
-            self.iso.translation += Vector3::x() * dt;
-        }
-        if keys_down.contains(&VirtualKeyCode::Right) {
-            self.iso.translation -= Vector3::x() * dt;
-        }
-        if keys_down.contains(&VirtualKeyCode::Up) {
-            self.iso.translation += Vector3::z() * dt * self.iso.rotation;
-        }
-        if keys_down.contains(&VirtualKeyCode::Down) {
-            self.iso.translation -= Vector3::z() * dt * self.iso.rotation;
-        }
-
-        self.view = self.iso.to_homogeneous();
+    pub fn pan_rot_mut(&mut self, dt: f32, pan: Vector2<f32>, rot: f32) {
+        if pan.x != 0.0 { self.iso.translation += Vector3::x() * dt * pan.x; }
+        if pan.y != 0.0 { self.iso.translation += Vector3::z() * dt * pan.y * self.iso.rotation; }
+        if rot != 0.0 { self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * rot * dt)); }
+        if pan.x != 0.0 || pan.y != 0.0 || rot != 0.0 { self.view = self.iso.to_homogeneous(); }
     }
 
-    pub fn rotate(&mut self, dt: f32, dist: f32) {
-        debug!("rotating by {}", dt * dist);
-        self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * dist * dt));
-        self.view = self.iso.to_homogeneous();
+    pub fn rot_mut(&mut self, dt: f32, rot: f32) {
+        if rot != 0.0 {
+            self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * rot * dt));
+            self.view = self.iso.to_homogeneous();
+        }
     }
 }

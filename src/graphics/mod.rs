@@ -1,5 +1,6 @@
 pub mod svo_graphics;
 pub mod camera;
+pub mod key_down;
 
 use gfx;
 pub type ColorFormat = gfx::format::Rgba8;

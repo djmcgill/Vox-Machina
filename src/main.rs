@@ -29,7 +29,6 @@ extern crate gfx_device_gl;
 extern crate gfx_window_glutin;
 extern crate arrayvec;
 
-
 macro_rules! get(
     ($e:expr) => (match $e { Some(e) => e, None => return None })
 );

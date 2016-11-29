@@ -4,12 +4,15 @@ use gfx_window_glutin;
 use gfx;
 use gfx::{Bundle, Factory, texture};
 use glutin;
+use glutin::ElementState;
 use graphics::*;
 use graphics::camera::OverheadCamera;
+use graphics::key_down::KeyDown;
 use nalgebra;
-use svo::SVO;
+use nalgebra::PerspectiveMatrix3;
 use std::collections::HashSet;
 use std::time;
+use svo::SVO;
 
 pub struct Config {
     pub size: (u16, u16),
@@ -29,13 +32,15 @@ pub struct App {
     encoder: gfx::Encoder<R, C>,
     camera: OverheadCamera,
     proj: nalgebra::Matrix4<f32>,
-    keys_down: HashSet<glutin::VirtualKeyCode>, // TODO: use EnumSet instead
+    keys_down: HashSet<KeyDown>,
     drag_mouse_position: Option<(i32, i32)>,
     current_cursor_position: (i32, i32),
     last_instant: time::Instant,
 }
 
 const MAX_INSTANCE_COUNT: u32 = 2048;
+const CAMERA_PAN_MULT: f32 = 1.0/32.0;
+const CAMERA_ROT_MULT: f32 = 1.0/64.0;
 
 pub struct Init {
     pub color: gfx::handle::RenderTargetView<R, ColorFormat>,
@@ -45,9 +50,6 @@ pub struct Init {
 
 impl App {
     pub fn launch(title: &str, config: Config) {
-        use nalgebra::PerspectiveMatrix3;
-        use gfx::traits::Device;
-
         env_logger::init().unwrap();
         let gl_version = glutin::GlRequest::GlThenGles {
             opengl_version: (3, 2),
@@ -68,61 +70,93 @@ impl App {
         };
 
         let mut app = Self::new(factory, init);
-
-        'main: loop {
-            let dt = app.update_dt();
-            
-            // quit when Esc is pressed.
-            for event in window.poll_events() {
-                // debug!("{:?}", event);
-                match event {
-                    glutin::Event::KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) |
-                    glutin::Event::Closed => break 'main,
-                    glutin::Event::Resized(width, height) => {
-                        let new_aspect_ratio = width as f32 / height as f32;
-                        app.proj = PerspectiveMatrix3::<f32>::new(new_aspect_ratio, 45.0f32.to_radians(), 1.0, 100.0).to_matrix();
-                    }
-                    glutin::Event::KeyboardInput(element_state, _, Some(key_code)) => {
-                        app.update_keys_down(element_state, key_code);
-                    }
-                    glutin::Event::MouseMoved(x, y) => {
-                        if app.drag_mouse_position.is_some() {
-                            let dy = (y - app.current_cursor_position.1) as f32;
-                            if dy != 0.0 { app.camera.rotate(dt, dy); };
-                        };
-                        app.current_cursor_position = (x, y);
-                        
-                    },
-                    glutin::Event::MouseInput(press_state, glutin::MouseButton::Left) => 
-                        app.drag_mouse_position = match press_state {
-                            glutin::ElementState::Pressed => Some(app.current_cursor_position),
-                            glutin::ElementState::Released => None,
-                        },
-                    _ => {}
-                }
-            }
-
-            app.camera.update_from_keys(dt, &app.keys_down);
-
-            // draw a frame
-            app.render(&mut device);
-            window.swap_buffers().unwrap();
-            device.cleanup();
-        }
+        app.main_loop(&window, &mut device);
+        
     }
 
-    pub fn update_keys_down(&mut self,
-                            element_state: glutin::ElementState,
-                            key_code: glutin::VirtualKeyCode) {
+    fn main_loop<D>(&mut self, window: &glutin::Window, mut device: &mut D) 
+            where D: gfx::Device<Resources=R, CommandBuffer=C> { loop {
+        use glutin::Event::*;
+        let dt = self.update_dt();
+        
+        // quit when Esc is pressed.
+        for event in window.poll_events() {
+            // debug!("{:?}", event);
+            match event {
+                KeyboardInput(_, _, Some(glutin::VirtualKeyCode::Escape)) |
+                Closed => return,
+                Resized(width, height) => {
+                    let new_aspect_ratio = width as f32 / height as f32;
+                    self.proj = PerspectiveMatrix3::<f32>::new(new_aspect_ratio, 45.0f32.to_radians(), 1.0, 100.0).to_matrix();
+                },
+                KeyboardInput(element_state, _, Some(key_code)) => {
+                    self.update_keys_down(element_state, key_code);
+                },
+                MouseMoved(x, y) => {
+                    if self.drag_mouse_position.is_some() {
+                        let dy = (y - self.current_cursor_position.1) as f32;
+                        if dy != 0.0 { self.camera.rot_mut(dt, dy); };
+                    };
+                    self.current_cursor_position = (x, y);
+                    
+                },
+                MouseInput(press_state, glutin::MouseButton::Left) => 
+                    self.drag_mouse_position = match press_state {
+                        ElementState::Pressed => Some(self.current_cursor_position),
+                        ElementState::Released => None,
+                    },
+                _ => {}
+            }
+        }
+
+        App::update_camera(&mut self.camera, dt, &self.keys_down);
+
+        // draw a frame
+        self.render(&mut device as &mut D);
+        window.swap_buffers().unwrap();
+        device.cleanup();
+    }}
+
+    fn update_keys_down(&mut self,
+                        element_state: glutin::ElementState,
+                        key_code: glutin::VirtualKeyCode) {
         match element_state {
             glutin::ElementState::Pressed => {
-                self.keys_down.insert(key_code);
+                let _ = self.keys_down.insert(KeyDown::Key(key_code));
+                // assert!(was_inserted); Watch out for key repeat from the OS!
             }
             glutin::ElementState::Released => {
-                let was_removed = self.keys_down.remove(&key_code);
+                let was_removed = self.keys_down.remove(&KeyDown::Key(key_code));
                 assert!(was_removed); // If false, weird things are happening
             }
         }
+    }
+
+    fn update_camera(camera: &mut OverheadCamera, dt: f32, keys_down: &HashSet<KeyDown>) {
+        use nalgebra::Vector2;
+        use glutin::VirtualKeyCode;
+        let mut pan = Vector2 { x: 0.0, y: 0.0 };
+        if keys_down.contains(&VirtualKeyCode::Left.into()) {
+            pan.x += 1.0;
+        }
+        if keys_down.contains(&VirtualKeyCode::Right.into()) {
+            pan.x -= 1.0;
+        }
+        if keys_down.contains(&VirtualKeyCode::Up.into()) {
+            pan.y += 1.0;
+        }
+        if keys_down.contains(&VirtualKeyCode::Down.into()) {
+            pan.y -= 1.0;
+        }
+
+        let mut rot = 0.0;
+        if keys_down.contains(&VirtualKeyCode::Q.into()) {
+            rot += 1.0;
+        }
+        if keys_down.contains(&VirtualKeyCode::E.into()) {
+            rot -= 1.0;
+        }
+        camera.pan_rot_mut(dt, pan, rot);
     }
 
     fn update_dt(&mut self) -> f32 {
@@ -160,12 +194,13 @@ impl App {
             texture::Kind::D2(1, 1, texture::AaMode::Single), &[&texels]
             ).unwrap();
 
-        let sinfo = texture::SamplerInfo::new(texture::FilterMethod::Bilinear,
-                                              texture::WrapMode::Clamp);
+        let sinfo = texture::SamplerInfo::new(texture::FilterMethod::Bilinear, texture::WrapMode::Clamp);
 
-        let vs = include_bytes!("shader/cube_150.glslv");
-        let ps = include_bytes!("shader/cube_150.glslf");
-        let pso = factory.create_pipeline_simple(vs, ps, pipe::new()).unwrap();
+        let pso = factory.create_pipeline_simple(
+            include_bytes!("shader/cube_150.glslv"), 
+            include_bytes!("shader/cube_150.glslf"), 
+            pipe::new()
+        ).unwrap();
 
         let data = pipe::Data {
             vbuf: quad_vertices,
@@ -196,8 +231,7 @@ impl App {
     }
 
     fn render<D>(&mut self, device: &mut D)
-        where D: gfx::Device<Resources = R, CommandBuffer = C>
-    {
+            where D: gfx::Device<Resources = R, CommandBuffer = C> {
         {
             let mut instances = self.mapping.read_write();
             let instance_count = self.svo.fill_instances(&mut instances, self.svo_max_height);
