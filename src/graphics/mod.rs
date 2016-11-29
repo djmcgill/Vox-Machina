@@ -1,5 +1,6 @@
 pub mod svo_graphics;
-pub mod camera;
+pub mod controller;
+pub mod model;
 pub mod key_down;
 
 use gfx;

@@ -6,12 +6,12 @@ use gfx::{Bundle, Factory, texture};
 use glutin;
 use glutin::ElementState;
 use graphics::*;
-use graphics::camera::OverheadCamera;
+use graphics::controller::CameraController;
+use graphics::controller::DtController;
 use graphics::key_down::KeyDown;
 use nalgebra;
 use nalgebra::PerspectiveMatrix3;
 use std::collections::HashSet;
-use std::time;
 use svo::SVO;
 
 pub struct Config {
@@ -30,17 +30,15 @@ pub struct App {
     svo: SVO,
     svo_max_height: i32,
     encoder: gfx::Encoder<R, C>,
-    camera: OverheadCamera,
+    camera_controller: CameraController,
     proj: nalgebra::Matrix4<f32>,
     keys_down: HashSet<KeyDown>,
     drag_mouse_position: Option<(i32, i32)>,
     current_cursor_position: (i32, i32),
-    last_instant: time::Instant,
+    dt_controller: DtController,
 }
 
 const MAX_INSTANCE_COUNT: u32 = 2048;
-const CAMERA_PAN_MULT: f32 = 1.0/32.0;
-const CAMERA_ROT_MULT: f32 = 1.0/64.0;
 
 pub struct Init {
     pub color: gfx::handle::RenderTargetView<R, ColorFormat>,
@@ -77,7 +75,7 @@ impl App {
     fn main_loop<D>(&mut self, window: &glutin::Window, mut device: &mut D) 
             where D: gfx::Device<Resources=R, CommandBuffer=C> { loop {
         use glutin::Event::*;
-        let dt = self.update_dt();
+        let dt = self.dt_controller.update_mut();
         
         // quit when Esc is pressed.
         for event in window.poll_events() {
@@ -94,8 +92,7 @@ impl App {
                 },
                 MouseMoved(x, y) => {
                     if self.drag_mouse_position.is_some() {
-                        let dy = (y - self.current_cursor_position.1) as f32;
-                        if dy != 0.0 { self.camera.rot_mut(dt, dy); };
+                        self.camera_controller.mouse_moved_mut(dt, self.current_cursor_position, (x, y))
                     };
                     self.current_cursor_position = (x, y);
                     
@@ -109,7 +106,7 @@ impl App {
             }
         }
 
-        App::update_camera(&mut self.camera, dt, &self.keys_down);
+        self.camera_controller.update_with_keys_mut(dt, &self.keys_down);
 
         // draw a frame
         self.render(&mut device as &mut D);
@@ -130,42 +127,6 @@ impl App {
                 assert!(was_removed); // If false, weird things are happening
             }
         }
-    }
-
-    fn update_camera(camera: &mut OverheadCamera, dt: f32, keys_down: &HashSet<KeyDown>) {
-        use nalgebra::Vector2;
-        use glutin::VirtualKeyCode;
-        let mut pan = Vector2 { x: 0.0, y: 0.0 };
-        if keys_down.contains(&VirtualKeyCode::Left.into()) {
-            pan.x += 1.0;
-        }
-        if keys_down.contains(&VirtualKeyCode::Right.into()) {
-            pan.x -= 1.0;
-        }
-        if keys_down.contains(&VirtualKeyCode::Up.into()) {
-            pan.y += 1.0;
-        }
-        if keys_down.contains(&VirtualKeyCode::Down.into()) {
-            pan.y -= 1.0;
-        }
-
-        let mut rot = 0.0;
-        if keys_down.contains(&VirtualKeyCode::Q.into()) {
-            rot += 1.0;
-        }
-        if keys_down.contains(&VirtualKeyCode::E.into()) {
-            rot -= 1.0;
-        }
-        camera.pan_rot_mut(dt, pan * CAMERA_PAN_MULT, rot * CAMERA_ROT_MULT);
-    }
-
-    fn update_dt(&mut self) -> f32 {
-        let now = time::Instant::now();
-        let duration = now.duration_since(self.last_instant);
-        let dt = (duration.as_secs() * 1000) as f32 +
-                        (duration.subsec_nanos() / 1000_000) as f32; 
-        self.last_instant = now;
-        dt
     }
 
     fn new(mut factory: F, init: Init) -> Self {
@@ -218,10 +179,10 @@ impl App {
             svo_max_height: max_height,
             keys_down: HashSet::new(),
             encoder: factory.create_command_buffer().into(),
-            camera: OverheadCamera::new(),
+            camera_controller: CameraController::new(),
             drag_mouse_position: None,
             current_cursor_position: (0, 0),
-            last_instant: time::Instant::now(),
+            dt_controller: DtController::new(),
             proj: PerspectiveMatrix3::<f32>::new(init.aspect_ratio,
                                                  45.0f32.to_radians(),
                                                  1.0,
@@ -238,7 +199,7 @@ impl App {
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
-        let view = self.camera.view();
+        let view = self.camera_controller.camera.view();
         let locals = Locals { transform: *(self.proj * view).as_ref() };
         self.encoder.update_constant_buffer(&self.bundle.data.locals, &locals);
 
