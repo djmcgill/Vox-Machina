@@ -4,12 +4,10 @@ use gfx_window_glutin;
 use gfx;
 use gfx::{Bundle, Factory, texture};
 use glutin;
-use glutin::ElementState;
 use graphics::*;
-use graphics::controller::{CameraController, DtController, KeysDownController};
+use graphics::controller::*;
 use nalgebra;
 use nalgebra::PerspectiveMatrix3;
-use svo::SVO;
 
 pub struct Config {
     pub size: (u16, u16),
@@ -24,14 +22,12 @@ type F = gfx_device_gl::Factory;
 pub struct App {
     bundle: Bundle<R, pipe::Data<R>>,
     mapping: gfx::mapping::RWable<R, Instance>,
-    svo: SVO,
-    svo_max_height: i32,
+    svo_controller: SvoController,
     encoder: gfx::Encoder<R, C>,
     camera_controller: CameraController,
     proj: nalgebra::Matrix4<f32>,
     keys_down_controller: KeysDownController,
-    drag_mouse_position: Option<(i32, i32)>,
-    current_cursor_position: (i32, i32),
+    mouse_position_controller: MousePositionController,
     dt_controller: DtController,
 }
 
@@ -88,17 +84,15 @@ impl App {
                     self.keys_down_controller.update(element_state, key_code);
                 },
                 MouseMoved(x, y) => {
-                    if self.drag_mouse_position.is_some() {
-                        self.camera_controller.mouse_moved_mut(dt, self.current_cursor_position, (x, y))
+                    let new_position = (x, y);
+                    if self.mouse_position_controller.is_dragging() {
+                        let old_position = self.mouse_position_controller.current_mouse_position;
+                        self.camera_controller.mouse_moved_mut(dt, old_position, new_position)
                     };
-                    self.current_cursor_position = (x, y);
-                    
+                    self.mouse_position_controller.update_position_mut(new_position);
                 },
                 MouseInput(press_state, glutin::MouseButton::Left) => 
-                    self.drag_mouse_position = match press_state {
-                        ElementState::Pressed => Some(self.current_cursor_position),
-                        ElementState::Released => None,
-                    },
+                    self.mouse_position_controller.update_drag_position_mut(press_state),
                 _ => {}
             }
         }
@@ -119,11 +113,10 @@ impl App {
             factory.create_buffer_persistent_rw(MAX_INSTANCE_COUNT as usize,
                                                 gfx::buffer::Role::Vertex,
                                                 gfx::Bind::empty());
-        let svo = SVO::example();
-        let max_height = 2;
+        let svo_controller = SvoController::new();
         let instance_count = {
             let mut instances = instance_mapping.read_write();
-            svo.fill_instances(&mut instances, max_height)
+            svo_controller.svo.fill_instances(&mut instances, svo_controller.max_height)
         };
         assert!(instance_count <= MAX_INSTANCE_COUNT);
 
@@ -157,13 +150,11 @@ impl App {
         App {
             bundle: Bundle::new(slice, pso, data),
             mapping: instance_mapping,
-            svo: svo,
-            svo_max_height: max_height,
+            svo_controller: svo_controller,
             keys_down_controller: KeysDownController::new(),
             encoder: factory.create_command_buffer().into(),
             camera_controller: CameraController::new(),
-            drag_mouse_position: None,
-            current_cursor_position: (0, 0),
+            mouse_position_controller: MousePositionController::new(),
             dt_controller: DtController::new(),
             proj: PerspectiveMatrix3::<f32>::new(init.aspect_ratio,
                                                  45.0f32.to_radians(),
@@ -177,7 +168,7 @@ impl App {
             where D: gfx::Device<Resources = R, CommandBuffer = C> {
         {
             let mut instances = self.mapping.read_write();
-            let instance_count = self.svo.fill_instances(&mut instances, self.svo_max_height);
+            let instance_count = self.svo_controller.svo.fill_instances(&mut instances, self.svo_controller.max_height);
             self.bundle.slice.instances = Some((instance_count, 0));
         }
 
