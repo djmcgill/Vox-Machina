@@ -1,39 +1,58 @@
 use nalgebra::*;
+use num::{One, Zero};
 
 #[derive(Debug)]
+// A translation followed by a rotation.
 pub struct OverheadCamera {
-    iso: Isometry3<f32>,
-    view: Matrix4<f32>, // Cached from the other parameters
+    translation: Vector3<f32>,
+    rotation: Rotation3<f32>,
+    view_cache: Matrix4<f32>,
 }
 
-const INITAL_TARGET: Point3<f32> = Point3 { x: 0.0, y: 0.0, z: 0.0 };
-const INITIAL_EYE: Point3<f32> = Point3 { x: 4.5, y: -15.0, z: 9.0 };
+const INITIAL_CAMERA_START: Vector3<f32> = Vector3 { x: 0.0, y: 0.0, z: -50.0 };
+
+const PAN_MULT: f32 = 1.0/32.0;
+const ROT_MULT: f32 = 1.0/256.0;
 
 impl OverheadCamera {
     pub fn new() -> OverheadCamera {
-        let up = Vector3::z();
-        let iso = Isometry3::<f32>::look_at_rh(&INITIAL_EYE, &INITAL_TARGET, &up);
+        let translation = INITIAL_CAMERA_START;
+        let rotation = Rotation3::look_at_rh(&translation, &Vector3::y());
+        
         OverheadCamera {
-            iso: iso,
-            view: iso.to_homogeneous(),
+            translation: translation,
+            rotation: rotation,
+            view_cache: OverheadCamera::generate_view(&translation, &rotation),
         }
     }
 
-    pub fn view(&self) -> Matrix4<f32> {
-        self.view
+    fn generate_view(translation: &Vector3<f32>, rotation: &Rotation3<f32>) -> Matrix4<f32> {
+        let mut result = Matrix4::one();
+        let col = Vector4::new(translation.x, translation.y, translation.z, 1.0);
+        result.set_column(3, col);
+        rotation.to_homogeneous() * result
     }
 
-    pub fn pan_rot_mut(&mut self, dt: f32, pan: Vector2<f32>, rot: f32) {
-        if pan.x != 0.0 { self.iso.translation += Vector3::x() * dt * pan.x; }
-        if pan.y != 0.0 { self.iso.translation += Vector3::z() * dt * pan.y * self.iso.rotation; }
-        if rot != 0.0 { self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * rot * dt)); }
-        if pan.x != 0.0 || pan.y != 0.0 || rot != 0.0 { self.view = self.iso.to_homogeneous(); }
+    fn regenerate_view(&mut self) {
+        self.view_cache = OverheadCamera::generate_view(&self.translation, &self.rotation);
+    }
+
+    pub fn view(&self) -> Matrix4<f32> {
+        self.view_cache
+    }
+
+    pub fn pan_rot_mut(&mut self, dt: f32, pan: Vector3<f32>, rot: f32) {
+        if pan != Vector3::zero() { self.translation.prepend_translation_mut(&(pan * dt * PAN_MULT)); }
+        if rot != 0.0 { self.rotation.prepend_rotation_mut(&(Vector3::y() * -rot * dt * ROT_MULT)); }
+        if pan != Vector3::zero() || rot != 0.0 {
+            self.regenerate_view();
+        }
     }
 
     pub fn rot_mut(&mut self, dt: f32, rot: f32) {
         if rot != 0.0 {
-            self.iso.rotation.prepend_rotation_mut(&(Vector3::z() * rot * dt));
-            self.view = self.iso.to_homogeneous();
+            self.rotation.prepend_rotation_mut(&(Vector3::y() * -rot * dt * ROT_MULT));
+            self.regenerate_view();
         }
     }
 }

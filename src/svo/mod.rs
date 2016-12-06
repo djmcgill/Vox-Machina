@@ -29,15 +29,10 @@ pub enum SVO {
 
 impl SVO {
     pub fn example() -> SVO {
-        SVO::new_octants(|i|
-            if i != 5 { SVO::new_voxel(VoxelData::new(1)) } else {
-                // Make the suboctant
-                SVO::new_octants(|i| {
-                    let data = [1, 1, 1, 1, 0, 0, 1, 1][i as usize];
-                    SVO::new_voxel(VoxelData::new(data))
-                })
-            }
-        )
+        SVO::new_octants(|i| {
+            let data = [1, 1, 1, 0, 1, 1, 0, 0][i as usize];
+            SVO::new_voxel(VoxelData::new(data))
+        })
     }
 
     pub fn new_voxel(voxel_data: VoxelData) -> SVO {
