@@ -9,6 +9,7 @@ use graphics::controller::*;
 use nalgebra;
 use nalgebra::PerspectiveMatrix3;
 
+use errors::*;
 pub struct Config {
     pub size: (u16, u16),
 }
@@ -40,7 +41,7 @@ pub struct Init {
 }
 
 impl App {
-    pub fn launch(title: &str, config: Config) {
+    pub fn launch(title: &str, config: Config) -> Result<()> {
         env_logger::init().unwrap();
         let gl_version = glutin::GlRequest::GlThenGles {
             opengl_version: (3, 2),
@@ -62,7 +63,7 @@ impl App {
 
         let mut app = Self::new(factory, init);
         app.main_loop(&window, &mut device);
-        
+        Ok(())
     }
 
     fn main_loop<D>(&mut self, window: &glutin::Window, mut device: &mut D) 

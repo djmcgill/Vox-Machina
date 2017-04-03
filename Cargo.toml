@@ -10,7 +10,8 @@ glutin = "0.7"
 env_logger = "0.3"
 log = "0.3.6"
 arrayvec = "0.3"
-num  = "0.1.*"
+num = "0.1.*"
+error-chain = "*"
 
 [dependencies.gfx]
 git = "https://github.com/gfx-rs/gfx.git"

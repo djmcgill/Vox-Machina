@@ -29,6 +29,12 @@ extern crate gfx_device_gl;
 extern crate gfx_window_glutin;
 extern crate arrayvec;
 extern crate num;
+#[macro_use]
+extern crate error_chain;
+
+mod errors {
+    error_chain! { }
+}
 
 macro_rules! get(
     ($e:expr) => (match $e { Some(e) => e, None => return None })
@@ -45,5 +51,23 @@ mod graphics;
 use app::App;
 
 pub fn main() {
-    App::launch("Vox Machina", app::DEFAULT_CONFIG);
+    if let Err(ref e) = App::launch("Vox Machina", app::DEFAULT_CONFIG) {
+        use ::std::io::Write;
+        let stderr = &mut ::std::io::stderr();
+        let errmsg = "Error writing to stderr";
+
+        writeln!(stderr, "error: {}", e).expect(errmsg);
+
+        for e in e.iter().skip(1) {
+            writeln!(stderr, "caused by: {}", e).expect(errmsg);
+        }
+
+        // The backtrace is not always generated. Try to run this example
+        // with `RUST_BACKTRACE=1`.
+        if let Some(backtrace) = e.backtrace() {
+            writeln!(stderr, "backtrace: {:?}", backtrace).expect(errmsg);
+        }
+
+        ::std::process::exit(1);
+    }
 }

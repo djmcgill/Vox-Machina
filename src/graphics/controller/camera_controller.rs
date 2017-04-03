@@ -49,6 +49,6 @@ impl CameraController {
         if keys_down.contains(&VirtualKeyCode::E.into()) {
             rot -= 1.0;
         }
-        self.camera.pan_rot_mut(dt, pan, rot);
+        self.camera.pan_rot_mut(dt, pan, rot, 0.0);
     }
 }
